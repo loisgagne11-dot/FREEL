@@ -567,7 +567,7 @@ chiffre faux.
 |---|---|---|
 | Effacer ses données d'un appareil | 🟢 nouveau | L'ancienne n'avait que « vider » le navigateur à la main. « Effacer cet appareil » (Données) et « Se déconnecter et effacer cet appareil » (Compte) proposent l'archive, déconnectent, effacent données, pièces, session, réglages — ceux de l'ancienne version compris — et le prouvent en relisant |
 | Se déconnecter | 🟢 | Dit désormais ce qui reste sur l'appareil |
-| Relier un compte, changer de projet | 🟢 22/11 | L'adresse collée avec le chemin de l'API (`/rest/v1/`) est ramenée à son origine — elle rendait la connexion impossible et ne se corrigeait plus ; l'écran dit le projet relié et offre « Changer de projet » (déconnecté seulement) |
+| Relier un compte, changer de projet | 🟢 22/11 | L'adresse collée avec le chemin de l'API (`/rest/v1/`) est ramenée à son origine — elle rendait la connexion impossible et ne se corrigeait plus ; l'écran dit le projet relié et offre « Changer de projet » (déconnecté seulement ; depuis le parcours de première connexion du 22/11, aussi connecté, après confirmation — voir la dernière section) |
 | Importer un relevé, une sauvegarde, une archive, une pièce | 🟢 | Bornés avant lecture, contrôlés en profondeur ; un fichier fabriqué est refusé avec le champ en cause. L'ancienne lisait tout, sans borne |
 | Rester connecté sur deux onglets | 🟢 | Les deux onglets ne se déconnectent plus l'un l'autre au renouvellement de la session |
 | Annonce d'une sauvegarde à restaurer | 🟢 | Un fichier que l'adoption refuserait est refusé dès l'annonce, sans proposer « Remplacer » |
@@ -729,3 +729,48 @@ mission qui la suit.
 | Supprimer une mission (refus motivé si une facture en relève) | 🟢 plus juste | Le refus lit la règle du facturé (`rattacherFactures`) au lieu de sa propre fenêtre de dates : une facture partie après la fin retient la mission (l'audit du jeu d'essai se supprimait en laissant sa facture au registre sans rien qui l'explique) ; une facture qu'une référence de commande donne à une autre mission ne la retient plus ; un brouillon d'un de ses payeurs la retient toujours. Message : « N recette(s) de ce client revient/reviennent à cette mission » |
 | Le facturé d'une mission, la composition d'un mois | 🟢 une source | Une seule fonction (`calculs/rattachementFactures`) ; la copie de `selecteurs.performance` a disparu |
 | Projection de trésorerie | 🟢 plus juste | Au barème, l'impôt des encaissements à venir ; chez un redevable, la TVA encaissée et sortie à sa déclaration (voir `AUDIT-GRAPHES-ET-INDICATEURS.md`, lot 50) |
+
+## 22/11 — Réglages › Compte & synchronisation, le parcours de première connexion
+
+L'écran est refait d'après `direction/compte.html`. Contrôle ligne à ligne :
+chaque geste de l'écran d'avant est ATTEINT, et ses tests passent à travers le
+nouveau (`Compte.test.tsx`, adapté aux libellés de la maquette ; les quatre
+tests de la saisie du projet sont repris par l'étape 3 du guide dans
+`Compte.parcours.test.tsx`).
+
+| Fonction de l'écran d'avant | Verdict | Où elle vit maintenant |
+|---|---|---|
+| Relier un compte : adresse et clé, « Enregistrer » | 🟢 plus sûr | Guide, étape 3 (ou « J'ai déjà un projet Supabase ») : « Vérifier » n'enregistre qu'un projet joint avec une clé acceptée ; l'adresse collée avec `/rest/v1/` est ramenée à son origine et le champ le montre ; une adresse en `http:` est refusée avant tout envoi, avec le motif |
+| L'aide « Où trouver ces informations » (renvoyait au fichier `docs/supabase.sql` du dépôt) | 🟢 autrement | Les étapes 1 à 3 du guide, les aides sous les champs, et « Copier le script » qui copie le fichier lui-même |
+| « Projet relié » et « Changer de projet » (déconnecté seulement) | 🟢 élargi | « Projet relié » en tête de « Ton compte » ; « Changer de projet » en pied de la santé du projet, déconnecté d'un geste, **connecté** après confirmation (déconnexion, puis l'étape 3). Absent quand le projet est fixé au build |
+| Se connecter | 🟢 | Onglet « Me connecter » de « Ton compte » |
+| Reprise de la session au chargement, renouvellement sous verrou | 🟢 inchangée | `Compte.tsx` ; `verifier:onglets` cherche désormais « Me déconnecter » |
+| L'aide « Ce que fait la connexion au compte » | 🟢 | Au titre de la carte « Sauvegardé » |
+| Connecté, serveur, « Compte enregistré le », « Cet appareil » | 🟢 | Carte « Sauvegardé » : Projet (l'hôte), Connecté, Cet appareil ; la date devient « Dernier envoi à … » (l'heure du compte distant, déjà lue) |
+| État du compte illisible : envoi désactivé, avertissement | 🟢 inchangé | Même phrase, pastille « état inconnu » |
+| « Enregistrer cet appareil sur le compte » — conséquence, confirmation (appareil vide, démonstration), conflit, refus d'un compte plus récent | 🟢 inchangé | « Dans un sens précis », sous « Synchroniser maintenant » |
+| « Charger le compte sur cet appareil » — aperçu, refus d'un bloc plus récent, compte vide | 🟢 inchangé | Idem |
+| « Reprendre les données de l'ancienne application » — aperçu, rapport, anomalies | 🟢 | Carte « Plus rarement » |
+| Se déconnecter | 🟢 | « Me déconnecter » ; même message sur ce qui reste sur l'appareil |
+| Se déconnecter et effacer cet appareil | 🟢 | « Plus rarement » |
+| États précédents du compte (voir, revenir) | 🟢 | « États précédents » en pied de la santé : la liste se lit dès l'ouverture (le clic l'a déjà demandée) |
+| Effacer la copie de cette version, effacer les données de l'ancienne application, bilan relu, identifiant à supprimer dans le tableau de bord | 🟢 | « Plus rarement » ; le message « règle absente » renvoie au script que l'étape 2 copie |
+| Règles d'accès : verdict par table, « Vérifier », « vérifié le », alerte et SQL copiable | 🟢 | Santé du projet : « Un inconnu ne lit rien » (heure de la vérification), « Le détail, table par table » (ouvert d'office quand quelque chose cloche), les mêmes alertes, « Vérifier à nouveau » |
+
+| Fonction nouvelle | Verdict | Détail |
+|---|---|---|
+| Rien n'est relié : deux portes | 🆕 | « Me guider pas à pas », « J'ai déjà un projet Supabase » ; « Sans compte » mène à Données & export |
+| Guide en cinq étapes | 🆕 | Fait ✓, en cours vert, à venir estompé ; l'étape survit à l'aller-retour vers supabase.com (stockage de l'onglet), jamais dans les faits |
+| « Copier le script » | 🆕 | `docs/supabase.sql` lu au build (`?raw`), module chargé à la demande ; presse-papiers refusé → le script s'affiche sélectionné |
+| « Vérifier » : un constat par maillon | 🆕 | Projet joignable (injoignable : la forme attendue ; ne répond pas : la pause), clé acceptée (clé refusée : la clé anon ; clé service_role reconnue, jamais envoyée ni gardée), base préparée (absente : refaire l'étape 2 ; une table sur deux : réexécuter), règles d'accès, inscriptions fermées. Aucun texte du serveur affiché |
+| Créer mon compte | 🆕 | Confirmation demandée (« un courriel est parti à … »), adresse déjà inscrite (y compris l'utilisateur factice sans identité), mot de passe trop faible, inscriptions fermées, adresse hors de l'équipe du projet, envoi limité |
+| Mot de passe oublié | 🆕 | Lien PKCE ; retour par `?code=`, retiré de l'adresse avant le premier rendu ; nouveau mot de passe ; lien expiré, déjà servi ou ouvert dans un autre navigateur : dit, avec le geste |
+| Adresse de retour à déclarer | 🆕 | Affichée et copiable sous « Créer mon compte » et « Mot de passe oublié ? » |
+| Inscriptions fermées, offre gratuite en pause | 🆕 | Constatées par relecture (étape 5, santé) ; la pause dite, et comment rouvrir |
+| « Sauvegardé » et sa pastille | 🆕 | À jour, à envoyer, à recevoir, diffère, rien encore — dérivée des deux côtés (`selecteurs.synchro`), rien de stocké ; la démonstration ne compte pas comme des données |
+| « Synchroniser maintenant » | 🆕 | Relit le compte, puis ne prend que le sens certain (compte vide : envoyer ; appareil vide : montrer avant de charger), par les mêmes confirmations ; sinon il fait choisir |
+
+`docs/supabase.sql` : la règle de `user_data` ne se pose plus que si la table
+existe. Sur un projet neuf, elle échouait et l'éditeur SQL annulait tout le
+script, table des faits comprise (constaté sur un Postgres 16 local) — un
+nouvel utilisateur ne pouvait pas préparer sa base.

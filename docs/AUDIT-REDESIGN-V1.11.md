@@ -1586,7 +1586,7 @@ absentes de la démonstration.
 | Projet relié | Rien ne le disait : l'écran ne montrait que courriel et mot de passe | « Projet relié : `<identifiant>.supabase.co` » au-dessus du formulaire, avec « Changer de projet » (bouton secondaire de l'écran, 44 px), déconnecté seulement, absent quand le projet est fixé au build |
 | Saisie du projet | « URL du projet », aide renvoyant à un menu de Supabase qui a changé de nom | « Adresse du projet » ; l'explication dit les trois étapes ; l'aide dit la forme attendue (`https://identifiant.supabase.co`) — une adresse collée avec `/rest/v1/` est ramenée à son origine |
 
-Pas de maquette pour cet écran : la ligne reprend les styles existants de la carte (`explication`, `action`). Le parcours complet de première connexion reste à dessiner (liste de sortie, « Hors lot »).
+Pas de maquette pour cet écran à cette date : la ligne reprenait les styles existants de la carte (`explication`, `action`). Le parcours complet a été dessiné (`direction/compte.html`), fusionné et codé le même jour : voir la section « 22/11 — Réglages › Compte & synchronisation, d'après `direction/compte.html` », plus bas.
 
 ## Logo et icônes (22/11)
 
@@ -1600,3 +1600,34 @@ Le handoff n'a ni favicon ni icône d'écran d'accueil : la référence est la p
 | Tête du rail (grand écran) | Le mot « freel » seul | La tuile du f (28 px) à gauche du mot, alignée sur la colonne des icônes du rail ; même tuile sombre dans les quatre thèmes (contrôlé en calme, nuit, clair, sombre) |
 
 Les PNG se regénèrent depuis le SVG (`app/scripts/generer-icones.mjs`), jamais à la main. `src/infra/icones.test.ts` tient les liens, les fichiers et le manifeste. Au téléphone, la barre basse ne porte pas de logo — comme la maquette.
+
+## 22/11 — Réglages › Compte & synchronisation, d'après `direction/compte.html`
+
+La maquette, fusionnée par le propriétaire le 22/11, fait foi pour le parcours
+et les textes ; les cartes, champs et boutons restent ceux de l'écran
+(`Compte.module.css`), et les onglets le composant `Onglets`. Captures :
+`node scripts/capturer-app.mjs --ecran=reglages-compte` (et `--largeur=390`),
+sept états — `reglages-compte` (rien relié), `-guide` (étape 2),
+`-verifier` (étape 3, base absente), `-ton-compte` (étape 4), `-inscriptions`
+(étape 5, ouvertes), `-deconnecte`, `-relie` —, en Calme et Nuit, à 1 440 et
+390 px, sur un projet factice que le script simule (aucune requête ne sort).
+Relues contre la maquette le 22/11.
+
+| État de la maquette | Application | Écart, et pourquoi |
+|---|---|---|
+| 1. Tes données sont sur cet appareil | Même titre, même phrase, deux portes (la première en vert plein), « Sans compte » vers Données & export | — |
+| 2. Relier FREEL en cinq étapes | Fil numéroté : fait ✓ sur fond `--green-deep`, en cours vert, à venir estompé ; « Ouvrir supabase.com ↗ » ; « Copier le script », « C'est fait » | Ajouté : « Il se relance sans rien perdre » (le script est idempotent), « ‹ Étape précédente » et « Quitter le guide » — la maquette ne dit pas comment sortir |
+| 3. Relier FREEL | Carte « 3. Relier FREEL », aides sous les champs, « Vérifier » pleine largeur, constats ✓ / ✗ / · | Ajouté : « ‹ Revoir l'étape 2 » sous une base absente, « Continuer » quand tout tient ; un constat « non vérifié » (?, ambre) quand une table n'a pas pu être comptée |
+| 4. Ton compte | Onglets « Me connecter » / « Créer mon compte », « Mot de passe oublié ? », la phrase des deux comptes | Onglets soulignés (composant `Onglets` de l'application) au lieu du segment en pilule ; ajouté sous « Créer mon compte » et « Mot de passe oublié ? » : l'adresse de retour à déclarer dans le projet, copiable |
+| 4. Fermer les inscriptions | Carte « 5. Fermer les inscriptions », constat relu, « vérifié à … — FREEL relit ce réglage », « Vérifier à nouveau » | Ajouté : « Terminer » quand elles sont fermées, « Plus tard » sinon |
+| 5. Sauvegardé ● à jour | Titre et pastille, « Dernier envoi à **9 h 41** », Projet, Connecté, « Synchroniser maintenant », « Me déconnecter » | « Tes autres appareils le reçoivent à leur prochaine ouverture » n'est pas écrit : c'est faux, la synchronisation est manuelle — remplacé par « Sur un autre appareil, « Charger le compte sur cet appareil » le récupère ». Ajoutés pour ne perdre aucun geste : « Cet appareil » (recettes, dépenses), « Dans un sens précis » (les deux transferts, chacun avec sa conséquence) |
+| 5. Santé du projet | Base préparée, Un inconnu ne lit rien (heure), Inscriptions fermées, Offre gratuite ; « Changer de projet », « États précédents » | Ajoutés : « Vérifier à nouveau » et « Le détail, table par table » (le verdict par table de l'ancien bloc « Règles d'accès ») ; le projet et la clé ne s'y montrent que lorsqu'ils cassent |
+| 5. « les gestes rares descendent en pied de carte » | Carte « Plus rarement » : reprise de l'ancienne version, effacer l'appareil, effacer du compte | Une carte à part plutôt que le pied de la santé : quatre gestes et leurs conséquences l'auraient noyée |
+| Boutons en pilule de 46 px | Boutons de l'écran (44 px, rayon `--r-sm`) ; un seul vert plein par vue | Styles de l'écran conservés, comme demandé ; la police est celle du système (décision 6) |
+
+Défaut trouvé à la relecture et corrigé : « Le détail, table par table »
+n'avait aucun signe de dépliage — un `<summary>` en `display: flex` perd le
+triangle du navigateur. Un chevron, qui tourne à l'ouverture (test nommé,
+mutation tuée). Le même défaut existe ailleurs dans l'application : liste de
+sortie, « Hors lot ». À 390 px, la barre basse fixe recouvre une bande de la
+capture en pleine page : artefact connu de toutes les captures au téléphone.
