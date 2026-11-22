@@ -25,6 +25,19 @@
          ne partent pas chez les tiers que l'on ouvre depuis elle (lot 58). -->
     <meta name="referrer" content="no-referrer" />
     <title>Freel</title>
+    <!-- Logo validé le 22/11 (piste 1, « le f »). Le SVG pour l'onglet ; la
+         tuile PLEINE pour l'écran d'accueil iOS, qui arrondit lui-même et
+         noircirait des coins transparents. Chemins relatifs, sans « / » de
+         tête : le site est servi sous un sous-chemin, l'ancienne version
+         sous /legacy/, et un « /favicon.svg » viserait la racine du domaine.
+         Icônes et manifeste viennent du même domaine : default-src et
+         img-src 'self' les laissent passer, la politique ne bouge pas.
+         scripts/generer-icones.mjs les produit ; icones.test.ts les tient. -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="apple-touch-icon" href="./icone-180.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#090c0a" />
+    <meta name="apple-mobile-web-app-title" content="Freel" />
     <link rel="stylesheet" href="/src/styles/tokens.css" />
     <link rel="stylesheet" href="/src/styles/base.css" />
     <!-- Applique le thème persisté avant le premier rendu, pour éviter le

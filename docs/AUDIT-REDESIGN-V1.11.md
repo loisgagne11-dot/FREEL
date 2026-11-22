@@ -1587,3 +1587,16 @@ absentes de la démonstration.
 | Saisie du projet | « URL du projet », aide renvoyant à un menu de Supabase qui a changé de nom | « Adresse du projet » ; l'explication dit les trois étapes ; l'aide dit la forme attendue (`https://identifiant.supabase.co`) — une adresse collée avec `/rest/v1/` est ramenée à son origine |
 
 Pas de maquette pour cet écran : la ligne reprend les styles existants de la carte (`explication`, `action`). Le parcours complet de première connexion reste à dessiner (liste de sortie, « Hors lot »).
+
+## Logo et icônes (22/11)
+
+Le handoff n'a ni favicon ni icône d'écran d'accueil : la référence est la planche du logo validée par le propriétaire le 22/11 (piste 1, « le f » — un f blanc cassé sur tuile vert-noir, sa barre en vert). Dessin repris tel quel.
+
+| Élément | Avant | Après |
+|---|---|---|
+| Onglet du navigateur | Icône générique | `favicon.svg`, tuile arrondie ; lisible à 16 px (vérifié sur fond clair et sombre) |
+| Écran d'accueil iOS | Capture de la page, nom tiré du titre | `icone-180.png`, tuile **pleine** (iOS arrondit et noircirait des coins transparents), nom « Freel » |
+| Installation Android / bureau | Aucun manifeste | `manifest.webmanifest` : « Freel », icônes 192 et 512 (`any`), 512 masquable (tuile pleine), couleur #090c0a |
+| Tête du rail (grand écran) | Le mot « freel » seul | La tuile du f (28 px) à gauche du mot, alignée sur la colonne des icônes du rail ; même tuile sombre dans les quatre thèmes (contrôlé en calme, nuit, clair, sombre) |
+
+Les PNG se regénèrent depuis le SVG (`app/scripts/generer-icones.mjs`), jamais à la main. `src/infra/icones.test.ts` tient les liens, les fichiers et le manifeste. Au téléphone, la barre basse ne porte pas de logo — comme la maquette.
