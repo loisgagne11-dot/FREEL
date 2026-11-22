@@ -190,7 +190,7 @@ un trou qui ne fait échouer aucun test.
 | Icône d'onglet, icône d'écran d'accueil, manifeste | 🟢 | L'ancienne les portait en `data:` (PNG 192 et manifeste en ligne, « Freel - Gestion Freelance »). La nouvelle : logo validé le 22/11 (piste 1), `favicon.svg`, icône Apple 180 pleine, manifeste « Freel » avec icônes 192, 512 et masquable — fichiers servis, chemins relatifs. Tenu par `icones.test.ts` |
 | `togglePrivacy` | 🟢 | Mode confidentiel vérifié dans un vrai navigateur : **zéro montant lisible** sur les 7 écrans |
 | Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait. **Lot 1 (06/11)** : un appareil resté sur une version ancienne ne peut plus écraser un compte écrit par une plus récente |
-| `_subscribeRealtime` — synchro temps réel | ❌ | Il faut recharger pour voir les changements d'un autre appareil |
+| `_subscribeRealtime` — synchro temps réel | 🟢 autrement (lot 42, 22/11) | Pas de canal permanent (audit produit, F9) : FREEL regarde le compte à l'ouverture, au retour au premier plan et au retour du réseau, et envoie quelques secondes après chaque modification. Un ordinateur resté ouvert se met à jour quand on y revient ; les deux côtés modifiés : « À choisir », jamais de fusion silencieuse. Voir la section du 22/11 ci-dessous |
 | `exportData` / `exportJSON` | ✅ | Export JSON complet |
 | `importData` / `importJSON` — **restauration** | ✅ | **Ajouté le 13/08.** Le fichier est lu, son contenu **annoncé** — tant de recettes, de dépenses, de missions —, et rien n'est écrasé avant confirmation. Le refus de fond (schéma plus récent que ce code) est relayé à l'écran plutôt qu'avalé. **Lot 1 (06/11)** : chaque élément de liste est contrôlé (un `[null]` faisait planter l'application à chaque ouverture) ; l'état local est **mis de côté** avant tout remplacement, et « Revenir à l'état d'avant » le rétablit |
 | Sûreté de l'enregistrement local | 🟢 | **Lot 1 (06/11), absent de l'ancienne** : deux onglets ne s'effacent plus (écoute `storage`, contrôle de révision avant écriture) ; un stockage plein se signale sur tous les écrans au lieu d'avaler les saisies ; un écran qui plante affiche un filet avec téléchargement des données brutes au lieu d'une page blanche |
@@ -767,10 +767,38 @@ tests de la saisie du projet sont repris par l'étape 3 du guide dans
 | Mot de passe oublié | 🆕 | Lien PKCE ; retour par `?code=`, retiré de l'adresse avant le premier rendu ; nouveau mot de passe ; lien expiré, déjà servi ou ouvert dans un autre navigateur : dit, avec le geste |
 | Adresse de retour à déclarer | 🆕 | Affichée et copiable sous « Créer mon compte » et « Mot de passe oublié ? » |
 | Inscriptions fermées, offre gratuite en pause | 🆕 | Constatées par relecture (étape 5, santé) ; la pause dite, et comment rouvrir |
-| « Sauvegardé » et sa pastille | 🆕 | À jour, à envoyer, à recevoir, diffère, rien encore — dérivée des deux côtés (`selecteurs.synchro`), rien de stocké ; la démonstration ne compte pas comme des données |
+| « Sauvegardé » et sa pastille | 🆕 | À jour, à envoyer, à recevoir, diffère, rien encore — dérivée des deux côtés (`selecteurs.synchro`), rien de stocké ; la démonstration ne compte pas comme des données. **Depuis le lot 42**, c'est l'état de la première liaison seulement : synchronisé, l'appareil dit l'état du moteur (section suivante) |
 | « Synchroniser maintenant » | 🆕 | Relit le compte, puis ne prend que le sens certain (compte vide : envoyer ; appareil vide : montrer avant de charger), par les mêmes confirmations ; sinon il fait choisir |
 
 `docs/supabase.sql` : la règle de `user_data` ne se pose plus que si la table
 existe. Sur un projet neuf, elle échouait et l'éditeur SQL annulait tout le
 script, table des faits comprise (constaté sur un Postgres 16 local) — un
 nouvel utilisateur ne pouvait pas préparer sa base.
+
+## 22/11 — Lot 42 : la synchronisation automatique, sans temps réel
+
+Avancé à la demande du propriétaire : relié sur téléphone et ordinateur, il
+devait « Enregistrer » sur l'un puis « Charger » sur l'autre. L'ancienne
+s'abonnait au temps réel (`_subscribeRealtime`) et écrasait le compte sans
+contrôle de version ; la nouvelle ne garde aucun canal ouvert, et ne fusionne
+jamais en silence.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Recevoir ce qu'un autre appareil a enregistré | 🟢 autrement | À l'ouverture, au retour au premier plan (`visibilitychange`), au retour du réseau (`online`) : si cet appareil n'a rien changé, il prend le compte — par `adopterFaitsDistants` (validation du schéma, copie de côté). Pas pendant une saisie : un volet modal ouvert ou un champ au focus font attendre qu'il se ferme |
+| Envoyer ce qui change ici | 🟢 | Trois secondes après la dernière modification, et au mieux en quittant (`keepalive` sous 64 Kio). Le filtre `version = base` reste : refusé, le moteur relit et repasse par la règle |
+| Les deux côtés ont changé | 🟢 plus sûr | « À choisir » : les dates des deux côtés, « Garder ce que j'ai ici » (l'état écarté part dans les vingt états précédents du serveur) ou « Prendre celui du compte » (l'état d'ici mis de côté dans Données), chacun précédé de « Télécharger la version que tu écartes » |
+| Un compte écrit par une version plus récente | 🟢 | Ni pris ni écrasé, même modifié ici : « Mets FREEL à jour » |
+| Compte effacé ailleurs, version qui recule, bloc illisible | 🆕 | « À vérifier » : dit, rien n'est renvoyé tout seul — un effacement demandé ailleurs n'est pas défait |
+| Appareil vidé (« Repartir de zéro ») | 🟢 | Ne vide pas le compte tout seul : « À choisir » |
+| La démonstration | 🟢 | Ni envoyée, ni remplacée par les vrais chiffres au retour sur l'onglet |
+| Deux onglets | 🟢 | Un seul travaille à la fois (verrou du lot 59), l'autre relit la base : une modification ne part qu'une fois |
+| Session expirée, refusée | 🟢 | Renouvelée sans bruit ; refusée : « Reconnecte-toi », rien de perdu |
+| Hors ligne, retard affiché | 🆕 | La pastille dit « Synchronisé à 9 h 41 » (l'heure de la dernière synchronisation réussie, retenue par l'appareil, jamais dans les faits), « Envoi… », « Hors ligne — changements à envoyer » ; nouvel essai espacé jusqu'à cinq minutes |
+| Première liaison | 🟢 inchangée | Tant que l'appareil n'a jamais synchronisé, rien d'automatique : le parcours de l'écran Compte et ses confirmations. Un appareil déjà relié entre dans l'automatique en ouvrant Réglages › Compte une fois (les deux côtés identiques), ou par un premier envoi ou chargement |
+| « Synchroniser maintenant » d'un appareil synchronisé | 🟢 une règle | Passe par le moteur : la même règle que l'automatique |
+| Restaurer une sauvegarde sur un appareil synchronisé | 🟢 dit | Elle part sur le compte ; Données le dit avant la confirmation |
+
+Ce qui n'est pas fait : le temps réel (sorti du plan, F9) — un ordinateur
+resté au premier plan sans qu'on y touche ne reçoit rien avant qu'on y
+revienne ou qu'on y modifie quelque chose.
