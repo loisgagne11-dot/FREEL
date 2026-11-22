@@ -201,3 +201,154 @@
 
 .succes { margin-top: 12px; font-size: 12.5px; line-height: 1.55; color: var(--green); }
 .echec { margin-top: 12px; font-size: 12.5px; line-height: 1.55; color: var(--red); }
+
+/* ── Le parcours de première connexion (maquette `direction/compte.html`) ──
+   Les cartes, champs et boutons restent ceux de l'écran ; s'y ajoutent ce que
+   la maquette dessine et que l'écran n'avait pas : le fil des cinq étapes, la
+   liste des constats, la pastille d'en-tête. */
+
+/* Plusieurs cartes l'une sous l'autre : la réponse, la santé, les gestes rares. */
+.pile { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.enTete { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.enTete .titreCarte { margin-bottom: 0; }
+
+/* Le vert plein, réservé à UNE action par vue (direction visuelle, « Bouton »). */
+.actionVerte { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.actionVerte:hover { border-color: var(--green); filter: brightness(1.05); }
+
+.pleineLargeur { width: 100%; align-self: stretch; }
+
+/* Les deux portes de l'accueil, l'une sous l'autre, sur toute la largeur. */
+.choix { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+
+/* Un lien qui se touche : 44 px de haut, même posé dans une phrase. */
+.lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.lien:hover { text-decoration: underline; }
+
+.aide { font-size: 12px; line-height: 1.5; color: var(--muted); }
+
+/* Ce qui se recopie tel quel : adresses, noms de clé. */
+.mono { font-family: var(--mono, ui-monospace, monospace); font-size: 0.95em; overflow-wrap: anywhere; }
+
+/* ── Le fil des étapes ──────────────────────────────────────────────────── */
+
+.etapes { list-style: none; margin: 4px 0 0; padding: 0; counter-reset: etape; }
+
+.etape {
+  position: relative;
+  padding: 12px 0 12px 40px;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+
+.etape:first-child { border-top: 0; }
+
+/* Le numéro : estompé à venir, vert en cours, coché une fois fait. Le mot
+   (« fait », « en cours ») est dit hors écran : la couleur seule ne porte
+   jamais un état. */
+.etape::before {
+  counter-increment: etape;
+  content: counter(etape);
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  background: var(--tint-2);
+  color: var(--muted);
+}
+
+.fait::before { content: "✓"; background: var(--green-deep); color: var(--chip-ok); }
+.ici::before { background: var(--green); color: var(--on-accent); }
+.plusTard { opacity: 0.55; }
+
+.etape b { display: block; font-size: 13.5px; font-weight: 620; color: var(--text); margin-bottom: 3px; }
+.etape small { display: block; font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.etape small strong { color: var(--text); font-weight: 600; }
+
+.horsEcran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Le script, montré quand le presse-papiers refuse : il défile, le bouton reste sous la main. */
+.script {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 14em;
+  overflow-y: auto;
+}
+
+/* ── Les constats d'une vérification ────────────────────────────────────── */
+
+.constats { list-style: none; margin: 6px 0 0; padding: 0; }
+
+.constat {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text);
+  min-width: 0;
+}
+
+.constat:first-child { border-top: 0; }
+.constat > div { min-width: 0; }
+.constat small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.5; color: var(--muted); overflow-wrap: anywhere; }
+
+.signe { flex: 0 0 16px; font-weight: 700; text-align: center; }
+.ok .signe { color: var(--green); }
+.ko .signe { color: var(--red); }
+.inconnu .signe { color: var(--amber); }
+.attente .signe, .info .signe { color: var(--muted-2); }
+.attente { color: var(--muted); }
+
+/* L'adresse de retour d'un lien : à recopier dans le projet, d'où le bouton. */
+.adresse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.adresse .mono { flex: 1 1 200px; color: var(--text); }

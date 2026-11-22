@@ -108,7 +108,10 @@ async function deuxOnglets(base, navigateur, { sansVerrou }) {
   await Promise.all([a.goto(`${base}#/reglages/compte`), b.goto(`${base}#/reglages/compte`)]);
   await Promise.all([a.waitForTimeout(2500), b.waitForTimeout(2500)]);
 
-  const connecte = async (p) => (await p.getByRole('button', { name: 'Se déconnecter', exact: true }).count()) > 0;
+  // « Me déconnecter » n'existe que sur l'écran relié ET connecté : c'est le
+  // signe qu'un onglet a gardé sa session. Le libellé a suivi la maquette du
+  // parcours de première connexion (22/11) ; il disait « Se déconnecter ».
+  const connecte = async (p) => (await p.getByRole('button', { name: 'Me déconnecter', exact: true }).count()) > 0;
   const resultat = {
     renouvellements,
     acceptes,
