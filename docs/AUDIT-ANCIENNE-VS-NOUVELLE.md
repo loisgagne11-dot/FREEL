@@ -187,6 +187,7 @@ un trou qui ne fait échouer aucun test.
 | Fonction de l'ancienne | Verdict | Détail |
 |---|---|---|
 | Thème, palettes | 🟢 | 4 palettes, appliquées **avant le premier rendu** (vérifié par assertion sur 140 combinaisons) |
+| Icône d'onglet, icône d'écran d'accueil, manifeste | 🟢 | L'ancienne les portait en `data:` (PNG 192 et manifeste en ligne, « Freel - Gestion Freelance »). La nouvelle : logo validé le 22/11 (piste 1), `favicon.svg`, icône Apple 180 pleine, manifeste « Freel » avec icônes 192, 512 et masquable — fichiers servis, chemins relatifs. Tenu par `icones.test.ts` |
 | `togglePrivacy` | 🟢 | Mode confidentiel vérifié dans un vrai navigateur : **zéro montant lisible** sur les 7 écrans |
 | Auth Supabase, synchro | 🟢 | Verrou optimiste **atomique côté serveur** ; l'ancienne écrasait. **Lot 1 (06/11)** : un appareil resté sur une version ancienne ne peut plus écraser un compte écrit par une plus récente |
 | `_subscribeRealtime` — synchro temps réel | ❌ | Il faut recharger pour voir les changements d'un autre appareil |
