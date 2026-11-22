@@ -21,11 +21,30 @@ vi.mock('../../infra/supabase.acces', async (original) => ({
     le: '2026-11-08T10:00:00.000Z'
   })
 }));
+/*
+ * La santé du projet relit aussi ses réglages (`/auth/v1/settings`) : même
+ * raison, elle a ses propres tests (`supabase.verification.test.ts`,
+ * `Compte.sante.test.tsx`). Ici, un projet en bonne santé.
+ */
+vi.mock('../../infra/supabase.verification', async (original) => ({
+  ...(await original<typeof import('../../infra/supabase.verification')>()),
+  verifierProjet: async () => ({
+    reglages: { statut: 'ok', valeur: { inscriptionsFermees: true, confirmationAutomatique: false } },
+    acces: {
+      faits: { statut: 'protegee' }, legacy: { statut: 'protegee' }, historique: { statut: 'protegee' },
+      le: '2026-11-08T10:00:00.000Z'
+    },
+    cleDeService: false,
+    le: '2026-11-08T10:00:00.000Z'
+  })
+}));
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 beforeEach(() => {
   vi.unstubAllGlobals();
+  // L'étape du guide vit dans le stockage de l'onglet : un test ne la lègue pas au suivant.
+  window.sessionStorage.clear();
   useFaits.setState({ faits: faitsVides() });
   useFaits.getState().initialiser(null);
   useFaits.setState({ faits: faitsVides() });
@@ -94,11 +113,12 @@ const BUNDLE_LEGACY = {
   }]
 };
 
+/** « Ton compte » arrive à la demande : on l'attend avant d'y taper. */
 async function seConnecter() {
   const utilisateur = userEvent.setup();
-  await utilisateur.type(screen.getByLabelText(/Adresse électronique/), 'demo@exemple.test');
-  await utilisateur.type(screen.getByLabelText(/Mot de passe/), 'motdepasse');
-  await utilisateur.click(screen.getByRole('button', { name: 'Se connecter' }));
+  await utilisateur.type(await screen.findByLabelText('Courriel'), 'demo@exemple.test');
+  await utilisateur.type(screen.getByLabelText('Mot de passe'), 'motdepasse');
+  await utilisateur.click(screen.getByRole('button', { name: 'Me connecter' }));
   return utilisateur;
 }
 
@@ -117,57 +137,35 @@ function ecritures(appel: ReturnType<typeof vi.fn>) {
 
 describe('configuration du compte', () => {
   // L'adresse d'un projet désigne le compte de quelqu'un : elle n'a rien à
-  // faire dans le dépôt, elle se saisit.
-  it('demande l’adresse du projet quand rien n’est configuré', () => {
+  // faire dans le dépôt, elle se saisit — mais plus d'emblée : l'écran
+  // commence par le pourquoi et deux portes (maquette, état 1).
+  it('sans projet relié, dit le pourquoi et ouvre deux portes, sans champ technique', () => {
     render(<Compte stockage={stockage()} />);
-    // Ciblé par rôle : le nom accessible de la section englobante reprend le
-    // texte de son explication, qui parle elle aussi de l'URL du projet.
-    expect(screen.getByRole('textbox', { name: /Adresse du projet/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Tes données sont sur cet appareil' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Me guider pas à pas' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'J’ai déjà un projet Supabase' })).toBeTruthy();
+    expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByLabelText(/Mot de passe/)).toBeNull();
   });
 
-  it('conserve la configuration saisie et passe à la connexion', async () => {
-    const local = stockage();
-    render(<Compte stockage={local} />);
-    const utilisateur = userEvent.setup();
-
-    await utilisateur.type(
-      screen.getByRole('textbox', { name: /Adresse du projet/ }), 'https://exemple.supabase.co'
-    );
-    await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
-    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
-
-    expect(local.contenu[CLE_CONFIG]).toContain('exemple.supabase.co');
-    expect(screen.getByLabelText(/Mot de passe/)).toBeTruthy();
-  });
-
-  it('enregistre l’adresse sans le chemin de l’API collé avec elle', async () => {
-    const local = stockage();
-    render(<Compte stockage={local} />);
-    const utilisateur = userEvent.setup();
-
-    await utilisateur.type(
-      screen.getByRole('textbox', { name: /Adresse du projet/ }), 'https://exemple.supabase.co/rest/v1/'
-    );
-    await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
-    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
-
-    expect(JSON.parse(local.contenu[CLE_CONFIG] ?? '{}')).toEqual(
-      { url: 'https://exemple.supabase.co', cleAnon: 'cle-anon' }
-    );
-  });
+  /*
+   * La saisie de l'adresse et de la clé, leur vérification et leur
+   * enregistrement sont testés avec le guide (`Compte.parcours.test.tsx`) :
+   * « Enregistrer » est devenu « Vérifier », qui n'enregistre qu'un projet
+   * joint avec une clé acceptée.
+   */
 
   // Une adresse enregistrée par erreur ne se corrigeait plus : l'écran ne
   // montrait que courriel et mot de passe (21/11).
   it('dit le projet relié et permet d’en changer', async () => {
     const local = CONFIGURE();
     render(<Compte stockage={local} />);
-    expect(screen.getByText('exemple.test')).toBeTruthy();
+    expect(await screen.findByText('exemple.test')).toBeTruthy();
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Changer de projet' }));
 
     expect(local.contenu[CLE_CONFIG]).toBeUndefined();
-    expect(screen.getByRole('textbox', { name: /Adresse du projet/ })).toBeTruthy();
+    expect(await screen.findByRole('textbox', { name: /Adresse du projet/ })).toBeTruthy();
   });
 });
 
@@ -772,23 +770,7 @@ describe('le renouvellement de session', () => {
   });
 });
 
-/**
- * UNE ADRESSE EN CLAIR EST REFUSÉE AVANT D'ÊTRE ENREGISTRÉE.
- *
- * Elle était enregistrée, puis refusée à la relecture : l'écran de saisie
- * revenait sans un mot.
+/*
+ * « Une adresse en clair est refusée avant d'être enregistrée » vit désormais
+ * avec l'étape 3 du guide (`Compte.parcours.test.tsx`).
  */
-describe('l’adresse du projet', () => {
-  it('refuse une adresse en http, et dit pourquoi', async () => {
-    const local = stockage();
-    render(<Compte stockage={local} />);
-    const utilisateur = userEvent.setup();
-    await utilisateur.type(screen.getByRole('textbox', { name: /Adresse du projet/ }), 'http://exemple.test');
-    await utilisateur.type(screen.getByRole('textbox', { name: /Clé publique/ }), 'cle-anon');
-    await utilisateur.click(screen.getByRole('button', { name: 'Enregistrer' }));
-
-    expect(screen.getByRole('alert').textContent).toMatch(/https:\/\//);
-    expect(local.contenu[CLE_CONFIG]).toBeUndefined();
-  });
-});
-

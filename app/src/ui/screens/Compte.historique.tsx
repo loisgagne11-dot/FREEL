@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFaits } from '../../state/store';
 import { VERSION_SCHEMA } from '../../state/schema';
 import { motifRefusExterieur } from '../../state/schema.exterieur';
@@ -28,6 +28,12 @@ export interface ProprietesEtatsPrecedents {
   readonly desactive: boolean;
   /** Le compte a changé, ou n'est plus celui qu'on croyait : le parent le reprend (`null` = à relire). */
   readonly onCompteModifie: (instantane: InstantaneDistant | null) => void;
+  /**
+   * Lire la liste dès l'affichage. Vrai quand on l'ouvre par « États
+   * précédents », en pied de la santé du projet : le clic a déjà dit qu'on la
+   * voulait, un second bouton « Voir » ne ferait que le redemander.
+   */
+  readonly lireDesLOuverture?: boolean;
 }
 
 type Liste =
@@ -44,10 +50,10 @@ const quand = (iso: string): string => {
 };
 
 export function EtatsPrecedents(
-  { config, session, distant, desactive, onCompteModifie }: ProprietesEtatsPrecedents
+  { config, session, distant, desactive, onCompteModifie, lireDesLOuverture = false }: ProprietesEtatsPrecedents
 ) {
   const adopterFaitsDistants = useFaits((e) => e.adopterFaitsDistants);
-  const [liste, setListe] = useState<Liste>({ phase: 'repos' });
+  const [liste, setListe] = useState<Liste>(() => (lireDesLOuverture ? { phase: 'chargement' } : { phase: 'repos' }));
   const [enCours, setEnCours] = useState(false);
   const [bilan, setBilan] = useState<{ readonly echec: boolean; readonly texte: string } | null>(null);
 
@@ -58,6 +64,12 @@ export function EtatsPrecedents(
     else if (r.statut === 'erreur') setListe({ phase: 'erreur', motif: r.motif });
     else setListe({ phase: 'lue', etats: r.valeur });
   }
+
+  useEffect(() => {
+    if (lireDesLOuverture) void charger();
+    // Une seule lecture, à l'ouverture : la liste se relit ensuite par ses gestes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Le compte D'ABORD, l'appareil ensuite.

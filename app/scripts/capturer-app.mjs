@@ -178,10 +178,91 @@ const VUES = [
   { hash: '#/reglages/reserve', nom: 'reglages-reserve', handoff: 'config-reserve', attendre: 'text=Besoin mensuel' },
   { hash: '#/reglages/facturation', nom: 'reglages-facturation', handoff: 'config-facturation', attendre: 'label:has-text("IBAN")' },
   { hash: '#/reglages/donnees', nom: 'reglages-donnees', handoff: 'config-donnees', attendre: 'text=Archive complète (ZIP)' },
-  { hash: '#/reglages/compte', nom: 'reglages-compte', handoff: 'config-cloud', attendre: 'text=Relier un compte' },
+  /* Compte & synchronisation (22/11) : la maquette `direction/compte.html` en
+     est la référence, état par état. Rien n'est relié ; le fil des étapes ;
+     « Vérifier » qui dit où ça coince ; ton compte ; fermer les inscriptions ;
+     relié. Chaque état part d'un appareil préparé (`compte`, voir
+     `preparerCompte`) et d'un faux projet qui répond comme Supabase
+     (`repondreCommeLeProjet`) : aucune requête ne sort. */
+  { hash: '#/reglages/compte', nom: 'reglages-compte', handoff: 'config-cloud', attendre: 'text=Tes données sont sur cet appareil' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-guide', compte: { guide: 2 }, attendre: 'text=Relier FREEL en cinq étapes' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-verifier', compte: { guide: 3, projet: 'base-absente' },
+    remplir: [['Adresse du projet', 'https://projet-demo.supabase.co/rest/v1/'], ['Clé publique (anon)', 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.factice']],
+    ouvrir: ['Vérifier'], attendre: 'text=Base pas encore préparée' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-ton-compte', compte: { guide: 4, relie: true }, attendre: 'text=4. Ton compte' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-deconnecte', compte: { relie: true }, attendre: 'text=Un inconnu ne lit rien' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-inscriptions', compte: { guide: 5, relie: true, connecte: true, projet: 'inscriptions-ouvertes' },
+    attendre: 'text=Inscriptions encore ouvertes' },
+  { hash: '#/reglages/compte', nom: 'reglages-compte-relie', compte: { relie: true, connecte: true, aJour: true }, attendre: 'text=Un inconnu ne lit rien' },
   /* Affichage (lot 51) : la maquette `navigation.html` en est la référence. */
   { hash: '#/reglages/affichage', nom: 'reglages-affichage', attendre: 'text=Le thème choisi reste mémorisé' }
 ];
+
+/* ── Le Compte : un appareil préparé, un projet factice ─────────────────── */
+
+/** Un projet qui n'existe pas : le navigateur n'en sort jamais, `route` répond. */
+const PROJET_FACTICE = 'https://projet-demo.supabase.co';
+let projetCourant = 'pret';
+
+/**
+ * Pose, dans la page, ce qu'un appareil porte à cet état du parcours : l'étape
+ * du guide (stockage de l'onglet), le projet relié, une session valable, et
+ * des faits qui ne sont PAS la démonstration — reconnue, elle ne compte pas
+ * comme des données, et l'écran relié dirait « rien à sauvegarder ».
+ */
+function preparerCompte({ guide, relie, connecte, aJour, jeu, projet }) {
+  if (guide !== undefined) sessionStorage.setItem('freel.compte.guide', String(guide));
+  if (relie) localStorage.setItem('freel.config.supabase.v1', JSON.stringify({ url: projet, cleAnon: 'eyJ.factice.anon' }));
+  if (connecte) {
+    localStorage.setItem('freel.session.supabase.v1', JSON.stringify({
+      jeton: 'jeton-factice', jetonRafraichissement: 'renouv-factice', expireLe: Date.now() + 3_600_000,
+      utilisateurId: '00000000-0000-0000-0000-000000000001', email: 'camille@exemple.test'
+    }));
+  }
+  if (aJour) {
+    sessionStorage.setItem('capture.faits', '1');
+    localStorage.setItem('freel.faits.v1', JSON.stringify({ ...jeu, entreprise: { ...jeu.entreprise, nom: 'Atelier Exemple' } }));
+  }
+}
+
+function oublierCompte() {
+  sessionStorage.clear();
+  localStorage.removeItem('freel.config.supabase.v1');
+  localStorage.removeItem('freel.session.supabase.v1');
+}
+
+/**
+ * Le faux projet : ses réglages d'authentification, ses tables comptées à zéro
+ * (ou absentes, pour l'état « base pas encore préparée »), et la ligne du
+ * compte — les faits mêmes de l'appareil, d'où « à jour ».
+ */
+async function repondreCommeLeProjet(route, page) {
+  const requete = route.request();
+  const url = requete.url();
+  const entetes = {
+    'content-type': 'application/json', 'access-control-allow-origin': '*',
+    'access-control-expose-headers': 'Content-Range'
+  };
+  if (requete.method() === 'OPTIONS') {
+    return route.fulfill({ status: 204, headers: { ...entetes, 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+  }
+  if (url.includes('/auth/v1/settings')) {
+    return route.fulfill({ status: 200, headers: entetes, body: JSON.stringify({
+      disable_signup: projetCourant !== 'inscriptions-ouvertes', mailer_autoconfirm: false
+    }) });
+  }
+  if (requete.method() === 'HEAD') {
+    const absente = projetCourant === 'base-absente' || url.includes('/user_data');
+    return route.fulfill({ status: absente ? 404 : 200, headers: { ...entetes, 'content-range': '*/0' } });
+  }
+  if (url.includes('/rest/v1/freel_faits?') && requete.method() === 'GET') {
+    const faits = JSON.parse(await page.evaluate(() => localStorage.getItem('freel.faits.v1')) ?? 'null');
+    return route.fulfill({ status: 200, headers: entetes, body: JSON.stringify(
+      faits === null ? [] : [{ version: 3, schema: faits.version, faits, maj_le: '2026-06-10T07:41:00Z' }]
+    ) });
+  }
+  return route.fulfill({ status: 200, headers: entetes, body: '[]' });
+}
 
 const themeDemande = argument('theme');
 const PALETTES = ['calme', 'nuit', 'clair', 'sombre'];
@@ -247,7 +328,11 @@ for (const theme of THEMES) {
   await contexte.addInitScript(
     ({ palette, faits, cle, maintenant }) => {
       window.localStorage.setItem('freel-v111-theme', palette);
-      window.localStorage.setItem(cle, JSON.stringify(faits));
+      // Une vue du Compte pose ses propres faits (`preparerCompte`) et recharge :
+      // les écraser ici les effacerait au rechargement.
+      if (window.sessionStorage.getItem('capture.faits') === null) {
+        window.localStorage.setItem(cle, JSON.stringify(faits));
+      }
       /* L'horloge est figée AVANT tout script de la page : `Date.now()` et
          `new Date()` sans argument rendent la date du handoff. Sans cela, la
          moitié des chiffres — retards, échéances à venir, allure sur l'année —
@@ -269,14 +354,28 @@ for (const theme of THEMES) {
   const page = await contexte.newPage();
   const erreurs = [];
   page.on('pageerror', (e) => erreurs.push(e.message.slice(0, 160)));
+  await contexte.route(`${PROJET_FACTICE}/**`, (route) => repondreCommeLeProjet(route, page));
 
   for (const vue of vues) {
     erreurs.length = 0;
+    projetCourant = vue.compte?.projet ?? 'pret';
+    if (vue.compte !== undefined) {
+      await page.goto(`${base}#/`, { waitUntil: 'networkidle' });
+      await page.evaluate(preparerCompte, { ...vue.compte, jeu: JEU, projet: PROJET_FACTICE });
+      await page.goto(base + vue.hash, { waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'networkidle' });
+    }
     await page.goto(base + vue.hash, { waitUntil: 'networkidle' });
     // Les écrans sont chargés à la demande : on attend le titre, sinon on
     // capturerait l'écran d'attente. `h1:visible` parce qu'un changement de
     // hash laisse le précédent monté en `display: none` pendant la suspension.
     await page.waitForSelector('h1:visible', { timeout: 15000 }).catch(() => {});
+
+    for (const [libelle, valeur] of vue.remplir ?? []) {
+      const champ = page.getByLabel(libelle, { exact: true }).first();
+      await champ.waitFor({ timeout: 15000 }).catch(() => {});
+      await champ.fill(valeur).catch(() => {});
+    }
 
     let ouverte = true;
     for (const libelle of vue.ouvrir ?? []) {
@@ -338,6 +437,7 @@ for (const theme of THEMES) {
     const pleinePage = !(vue.cadreAuTelephone === true && LARGEUR < 761);
     await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}${suffixe}.png`), fullPage: pleinePage });
     capturees += 1;
+    if (vue.compte !== undefined) await page.evaluate(oublierCompte);
     if (erreurs.length > 0) {
       manquees.push(`${theme}-${vue.nom} capturé MAIS erreur JS : ${erreurs[0]}`);
     }

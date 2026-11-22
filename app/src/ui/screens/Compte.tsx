@@ -1,74 +1,53 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { useFaits } from '../../state/store';
+import { Suspense, useEffect, useId, useState } from 'react';
 import {
-  type ConfigSupabase, type DonneesLegacy, type InstantaneDistant, type ResultatEffacement,
-  type Session, adresseDuProjet, bundleDepuisLegacy, chargerDonneesLegacy, configDeBuild, configEffective,
-  effacerDonneesLegacy, effacerFaitsDuCompte,
-  ecrireConfig, ecrireSession, motifUrlRefusee, pousserFaits, reprendreSession,
-  seConnecter, seDeconnecter, tirerFaits
+  type ConfigSupabase, type Session, type StockageLocal, configDeBuild, configEffective,
+  ecrireConfig, ecrireSession, lireSession, reprendreSession
 } from '../../infra/supabase';
-import { VERSION_SCHEMA, type Faits } from '../../state/schema';
-import { motifRefusExterieur } from '../../state/schema.exterieur';
-/**
- * `completerFaits` est importé STATIQUEMENT ici, contrairement à
- * `state/store.ts` : cet écran est déjà chargé à la demande (voir `App.tsx`,
- * qui le charge via `Config`), donc le module de migrations n'alourdit aucun
- * paquet de premier rendu en passant par lui. Le charger dynamiquement de
- * surcroît n'aurait rien économisé, et aurait coûté un aller-retour réseau à
- * chacun des trois usages ci-dessous.
- */
-import { completerFaits } from '../../state/schema.migrations';
-import type { RapportMigration } from '../../infra/migration';
-import { convertirBundle } from '../../infra/migration.legacy';
-import { estLeJeuDeDemonstration } from '../../domain/calculs/demonstration';
-import { Info } from '../components/Info';
-import { ConfirmationSurPlace } from '../components/ConfirmationSurPlace';
-import { dateCourte } from '../format';
-import { ReglesDAcces } from './Compte.acces';
-import { EtatsPrecedents } from './Compte.historique';
-import { PanneauEffacerAppareil } from './EffacerAppareil';
+import { oublierRetourDuLien, retourDuLien } from '../../infra/retourDuLien';
+import type { verifierProjet } from '../../infra/supabase.verification';
+import type { EtapeGuide } from './Compte.guide';
+import { composantALaDemande } from '../composantALaDemande';
+import { SanteDuProjet } from './Compte.sante';
 import styles from './Compte.module.css';
 
 /**
- * Compte distant — connexion, chargement et enregistrement.
+ * Réglages › Compte & synchronisation — le parcours de première connexion
+ * (maquette `docs/design/direction/compte.html`, retenue le 22/11).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * ON MONTRE AVANT DE REMPLACER
+ * CE QUE L'ÉCRAN MONTRE, ET DANS QUEL ORDRE
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Récupérer les données du compte ÉCRASE l'état local. C'est ce qu'on veut
- * — c'est le sens d'un compte partagé entre appareils — mais le faire en
- * silence ferait disparaître une saisie faite hors ligne sans que personne le
- * voie. L'écran affiche donc d'abord ce qui serait chargé, et attend une
- * confirmation.
+ *  · rien n'est relié : le pourquoi en une phrase, et deux portes — être guidé,
+ *    ou aller droit à l'adresse et à la clé (« J'ai déjà un projet ») ;
+ *  · le guide, en cinq étapes vérifiées (`Compte.guide`) ;
+ *  · relié mais pas connecté : « Ton compte » (`Compte.connexion`) et la santé
+ *    du projet ;
+ *  · connecté : la réponse d'abord — « Sauvegardé, à jour » —, puis la santé,
+ *    puis les gestes rares (`Compte.relie`) ;
+ *  · revenu d'un lien de courriel : son code, échangé (`Compte.connexion`).
  *
- * ─────────────────────────────────────────────────────────────────────────
- * DEUX TABLES, ET UNE SEULE REÇOIT DES ÉCRITURES
- * ─────────────────────────────────────────────────────────────────────────
- *
- * La table de l'ancienne application est LUE, jamais modifiée : c'est la
- * condition pour que l'ancienne version reste utilisable pendant toute la
- * cohabitation, et pour qu'un essai de la nouvelle ne puisse pas abîmer des
- * données comptables. Les faits de cette version-ci vont dans une table
- * distincte, la seule où l'écran écrive.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * AUCUN ENVOI À L'AVEUGLE
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Chaque envoi porte la version qu'on a lue. Si le compte a bougé depuis, le
- * serveur refuse, et l'écran présente les deux états côte à côte : c'est à
- * l'utilisateur de trancher, en sachant ce qu'il perd de chaque côté. Tant
- * que l'état du compte n'est pas connu, l'envoi reste indisponible — envoyer
- * sans savoir sur quoi on écrit est précisément ce qu'il faut empêcher.
+ * Il demandait autrefois l'adresse et la clé d'emblée, et renvoyait à un
+ * fichier du dépôt pour préparer la base : le propriétaire n'a pas pu relier
+ * son compte (21/11). Chaque morceau est chargé à la demande — l'écran
+ * entier dépassait le budget d'un écran différé (34,6 Ko sur 40) avant même
+ * le guide.
  */
 
+const Guide = composantALaDemande(() => import('./Compte.guide').then((m) => m.Guide), false);
+const TonCompte = composantALaDemande(() => import('./Compte.connexion').then((m) => m.TonCompte), false);
+const RetourDuLien = composantALaDemande(() => import('./Compte.connexion').then((m) => m.RetourDuLien), false);
+const Relie = composantALaDemande(() => import('./Compte.relie').then((m) => m.Relie), false);
+
 /** Le stockage du navigateur, ou un substitut inerte s'il est bloqué. */
-function stockageNavigateur() {
+function stockageNavigateur(
+  type: 'localStorage' | 'sessionStorage' = 'localStorage'
+): StockageLocal {
   try {
-    window.localStorage.setItem('__freel_test__', '1');
-    window.localStorage.removeItem('__freel_test__');
-    return window.localStorage;
+    const s = window[type];
+    s.setItem('__freel_test__', '1');
+    s.removeItem('__freel_test__');
+    return s;
   } catch {
     const memoire = new Map<string, string>();
     return {
@@ -80,1026 +59,217 @@ function stockageNavigateur() {
 }
 
 /**
- * Ce qu'on sait de la ligne du compte.
+ * L'étape du guide en cours, dans le stockage de SESSION de l'onglet.
  *
- * `'inconnu'` n'est pas `null` : l'un dit « le compte est vide », l'autre
- * « on n'a pas réussi à regarder ». Les confondre autoriserait un premier
- * envoi qui écraserait en fait des données existantes.
+ * C'est un état d'écran, pas un fait : il survit à l'aller-retour vers
+ * supabase.com et à un rechargement, pas à la fermeture de l'onglet. Le
+ * mettre dans les faits l'aurait fait voyager sur le compte vers les autres
+ * appareils, qui n'en ont que faire.
  */
-type EtatDistant = InstantaneDistant | null | 'inconnu';
+const CLE_GUIDE = 'freel.compte.guide';
 
-type Etat =
-  | { readonly phase: 'deconnecte' }
-  | { readonly phase: 'connecte'; readonly session: Session }
-  | {
-    readonly phase: 'apercu-legacy';
-    readonly session: Session;
-    readonly donnees: DonneesLegacy;
-    readonly rapport: RapportMigration;
-  }
-  | {
-    readonly phase: 'apercu-distant';
-    readonly session: Session;
-    readonly instantane: InstantaneDistant;
-    readonly faits: Faits;
-  }
-  | {
-    readonly phase: 'conflit';
-    readonly session: Session;
-    readonly distant: InstantaneDistant | null;
-  }
-  | {
-    readonly phase: 'confirmer-envoi';
-    readonly session: Session;
-    readonly distant: InstantaneDistant;
-    /**
-     * Pourquoi on demande confirmation.
-     *
-     * Les deux dangers écrasent le compte, et ils ne se racontent pas de la
-     * même façon : « cet appareil est vide » n'explique rien à qui vient de
-     * charger la démonstration et voit un écran plein de factures.
-     */
-    readonly motif: MotifDeConfirmation;
-  };
-
-/** Ce qui, sur cet appareil, ne doit pas partir sur le compte sans un mot. */
-type MotifDeConfirmation = 'appareil-vide' | 'jeu-de-demonstration';
-
-interface Resume {
-  readonly clients: number;
-  readonly missions: number;
-  readonly recettes: number;
-  readonly depenses: number;
+function lireEtape(s: StockageLocal): EtapeGuide | null {
+  const n = Number(s.getItem(CLE_GUIDE));
+  return n >= 1 && n <= 5 && Number.isInteger(n) ? n as EtapeGuide : null;
 }
 
-function resumer(faits: Faits): Resume {
-  return {
-    clients: faits.clients.length,
-    missions: faits.missions.length,
-    recettes: faits.recettes.length,
-    depenses: faits.depenses.length
-  };
-}
-
-/** Rien du tout : ni client, ni mission, ni recette, ni dépense. */
-function estVide(r: Resume): boolean {
-  return r.clients === 0 && r.missions === 0 && r.recettes === 0 && r.depenses === 0;
-}
-
-/**
- * Ce qui, sur cet appareil, ne doit pas partir sur le compte sans un mot —
- * ou `null` quand l'envoi est ordinaire.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * DEUX DANGERS, ET LE SECOND MANQUAIT
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Le premier est l'appareil VIDE : on installe l'application quelque part, elle
- * n'a rien, et « enregistrer sur le compte » est le bouton qui semble le plus
- * utile — il effacerait tout.
- *
- * Le second est le jeu de DÉMONSTRATION, et il n'était pas couvert : un
- * appareil rempli de factures fictives n'est pas vide, donc l'envoi partait
- * sans rien demander. Charger la démonstration pour regarder puis enregistrer
- * sur le compte écrasait des données réelles, en silence.
- *
- * L'ordre compte : le vide est vérifié d'abord parce qu'un dossier vide n'a
- * pas d'entreprise à reconnaître.
- */
-function motifDeConfirmation(faits: Faits): MotifDeConfirmation | null {
-  if (estVide(resumer(faits))) return 'appareil-vide';
-  return estLeJeuDeDemonstration(faits.entreprise) ? 'jeu-de-demonstration' : null;
-}
-
-function resumeCourt(r: Resume): string {
-  return estVide(r)
-    ? 'rien pour l’instant'
-    : `${r.recettes} recette(s), ${r.depenses} dépense(s), ${r.clients} client(s)`;
-}
-
-/**
- * Le résumé du bloc distant, quand il est lisible.
- *
- * `null` couvre deux cas qu'il ne faut surtout pas afficher comme « vide » :
- * le bloc est illisible, ou il vient d'une version qu'on ne sait pas lire.
- */
-function resumeDistant(instantane: InstantaneDistant): Resume | null {
-  return motifRefusExterieur(instantane.faits) === null
-    ? resumer(completerFaits(instantane.faits))
-    : null;
-}
-
-/**
- * Motif qui interdit d'envoyer cet appareil sur le compte, ou `null`.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * LA LECTURE REFUSAIT UN SCHÉMA PLUS RÉCENT, L'ÉCRITURE NON
- * ─────────────────────────────────────────────────────────────────────────
- *
- * Un appareil resté sur une ancienne version lisait un compte écrit par une
- * plus récente : le résumé distant était illisible, la confirmation ne se
- * déclenchait que pour un appareil vide ou en démonstration — et l'envoi
- * partait. Le serveur l'acceptait, puisque le compteur de version était le
- * bon, et le bloc récent était remplacé par ce qu'en voyait l'ancien.
- * Exactement ce que l'invariant n°5 interdit en lecture.
- *
- * Seul le schéma POSTÉRIEUR bloque. Un compte illisible pour une autre raison
- * — abîmé — reste remplaçable, avec la mention « contenu illisible » : le
- * bloquer aussi laisserait l'utilisateur sans aucun moyen de le réparer.
- */
-function motifRefusEnvoi(distant: InstantaneDistant | null): string | null {
-  if (distant === null) return null;
-  const brut = distant.faits as { version?: unknown } | null;
-  const versionFaits = typeof brut?.version === 'number' ? brut.version : 0;
-  const schema = Math.max(distant.schema, versionFaits);
-  if (schema <= VERSION_SCHEMA) return null;
-  return `Le compte a été enregistré par une version plus récente de l’application `
-    + `(schéma ${schema}, connu ici : ${VERSION_SCHEMA}). L’envoyer depuis cet appareil `
-    + `effacerait ce que cette version ne sait pas lire : mets d’abord l’application `
-    + `à jour ici, en rechargeant la page.`;
+function ecrireEtape(s: StockageLocal, e: EtapeGuide | null): void {
+  try {
+    if (e === null) s.removeItem(CLE_GUIDE);
+    else s.setItem(CLE_GUIDE, String(e));
+  } catch { /* sans stockage, le guide reprendra à l'accueil : rien de perdu */ }
 }
 
 export interface ProprietesCompte {
   /** Injectable pour les tests, où `window` n'a pas de stockage utile. */
-  readonly stockage?: ReturnType<typeof stockageNavigateur>;
+  readonly stockage?: StockageLocal;
+  /** Le stockage de l'onglet, où vit l'étape du guide. Injectable aussi. */
+  readonly ecran?: StockageLocal;
+  /** La vérification du projet. Injectable pour les tests. */
+  readonly verifier?: typeof verifierProjet;
 }
 
-export function Compte({ stockage }: ProprietesCompte = {}) {
-  const local = stockage ?? stockageNavigateur();
-  const remplacerParBundle = useFaits((e) => e.remplacerParBundle);
-  const adopterFaitsDistants = useFaits((e) => e.adopterFaitsDistants);
-  const faitsLocaux = useFaits((e) => e.faits);
+export function Compte({ stockage, ecran, verifier }: ProprietesCompte = {}) {
+  const [local] = useState(() => stockage ?? stockageNavigateur());
+  const [memoireEcran] = useState(() => ecran ?? stockageNavigateur('sessionStorage'));
+  const projetFixe = configDeBuild() !== null;
 
   const [config, setConfig] = useState<ConfigSupabase | null>(() => configEffective(local));
-  const [etat, setEtat] = useState<Etat>({ phase: 'deconnecte' });
-  const [distant, setDistant] = useState<EtatDistant>('inconnu');
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  // Une session conservée se reprend de façon asynchrone ; sans session
+  // conservée, rien à attendre — le formulaire s'affiche d'emblée.
+  const [repriseFaite, setRepriseFaite] = useState(() => config === null || lireSession(local) === null);
+  const [etape, setEtapeEtat] = useState<EtapeGuide | null>(() => (projetFixe ? null : lireEtape(memoireEcran)));
+  const [retour, setRetour] = useState<URLSearchParams | null>(() => retourDuLien());
   const [message, setMessage] = useState<string | null>(null);
-  // Le bilan d'un effacement s'affiche SOUS ses boutons : posé en bas de la
-  // carte, après les règles d'accès, il sortait de l'écran sur téléphone, et
-  // le geste le plus grave de l'écran restait sans réponse visible.
-  const [effacement, setEffacement] = useState<{ readonly echec: boolean; readonly texte: string } | null>(null);
-  const [enCours, setEnCours] = useState(false);
-  const [effacerOuvert, setEffacerOuvert] = useState(false);
-  const boutonEffacer = useRef<HTMLButtonElement>(null);
-  const idChamp = useId();
+
+  function allerA(e: EtapeGuide | null): void {
+    setEtapeEtat(e);
+    ecrireEtape(memoireEcran, e);
+  }
 
   // Une session conservée est reprise au chargement, et renouvelée si elle
   // approche de son terme : sans cela, il faudrait se reconnecter à chaque
-  // ouverture de l'application.
-  // Le renouvellement passe par un verrou commun aux onglets : voir
-  // `reprendreSession`, et pourquoi deux onglets se déconnectaient.
+  // ouverture de l'application. Le renouvellement passe par un verrou commun
+  // aux onglets : voir `reprendreSession`, et pourquoi deux onglets se
+  // déconnectaient.
   useEffect(() => {
-    if (config === null) return;
-    void reprendreSession(config, local).then((session) => {
-      if (session === null) return;
-      setEtat({ phase: 'connecte', session });
-      void relireEtatDistant(session);
+    if (config === null || repriseFaite) return;
+    let vivant = true;
+    void reprendreSession(config, local).then((s) => {
+      if (!vivant) return;
+      if (s !== null) setSession(s);
+      setRepriseFaite(true);
     });
-    // `local` et `config` sont stables sur la durée de vie de l'écran.
+    return () => { vivant = false; };
+    // `local` et `config` sont ceux de l'ouverture de l'écran : une reprise, pas un suivi.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (config === null) {
-    return <SaisieConfig idChamp={idChamp} onValider={(c) => {
-      ecrireConfig(local, c);
-      setConfig(c);
-    }} />;
+  function seConnecte(s: Session, texte: string | null): void {
+    ecrireSession(local, s);
+    setSession(s);
+    setRepriseFaite(true);
+    setMessage(texte);
+    if (etape === 4) allerA(5);
+  }
+
+  function relier(c: ConfigSupabase): void {
+    ecrireConfig(local, c);
+    setConfig(c);
   }
 
   /**
-   * Va chercher où en est le compte.
-   *
-   * Un échec laisse l'état à `'inconnu'`, ce qui interdit l'envoi. C'est
-   * voulu : écrire sans savoir ce qu'on recouvre est la seule façon de perdre
-   * des données sans s'en apercevoir.
+   * « Changer de projet » mène droit à l'adresse et à la clé : c'est ce qu'on
+   * vient changer. Une adresse enregistrée par erreur ne se corrigeait plus
+   * (21/11) ; on ne change de projet que déconnecté, une session ouverte
+   * appartenant au projet d'avant.
    */
-  async function relireEtatDistant(session: Session): Promise<InstantaneDistant | null> {
-    if (config === null) return null;
-    const r = await tirerFaits(config, session);
-    if (r.statut === 'erreur') {
-      setDistant('inconnu');
-      setErreur(r.motif);
-      return null;
-    }
-    setDistant(r.valeur);
-    return r.valeur;
-  }
-
-  async function connecter(email: string, motDePasse: string): Promise<void> {
-    if (config === null) return;
-    setEnCours(true);
-    setErreur(null);
-    const r = await seConnecter(config, email, motDePasse);
-    if (r.statut === 'erreur') { setEnCours(false); setErreur(r.motif); return; }
-    ecrireSession(local, r.valeur);
-    setEtat({ phase: 'connecte', session: r.valeur });
-    await relireEtatDistant(r.valeur);
-    setEnCours(false);
-  }
-
-  /* ── Envoyer ─────────────────────────────────────────────────────────── */
-
-  /**
-   * Le cas qu'il ne faut pas laisser passer d'un clic : envoyer le VIDE
-   * par-dessus des données.
-   *
-   * Il survient naturellement. On installe la nouvelle application sur un
-   * appareil, elle n'a encore rien, et « enregistrer sur le compte » est le
-   * bouton qui semble le plus utile — il effacerait tout. Le compteur de
-   * version ne protège pas de cela : la version distante est bien celle qu'on
-   * a lue, l'écriture est donc parfaitement légitime pour le serveur.
-   *
-   * Le contrôle est délibérément étroit : rien d'un côté, quelque chose de
-   * l'autre. Une règle plus large — « refuser si le compte a plus de lignes »
-   * — se déclencherait à chaque suppression volontaire, et une confirmation
-   * qu'on voit tout le temps ne se lit plus.
-   */
-  async function demanderEnvoi(session: Session): Promise<void> {
-    if (distant === 'inconnu' || motifRefusEnvoi(distant) !== null) return;
-    const cote = distant === null ? null : resumeDistant(distant);
-    const ecraserait = distant !== null && (cote === null || !estVide(cote));
-
-    const motif = motifDeConfirmation(faitsLocaux);
-    if (motif !== null && ecraserait && distant !== null) {
-      setErreur(null);
-      setMessage(null);
-      setEtat({ phase: 'confirmer-envoi', session, distant, motif });
-      return;
-    }
-    await envoyer(session, distant === null ? null : distant.version);
-  }
-
-  async function envoyer(session: Session, versionAttendue: number | null): Promise<void> {
-    if (config === null) return;
-    setEnCours(true);
-    setErreur(null);
+  function oublierProjet(): void {
+    ecrireConfig(local, null);
+    setConfig(null);
+    setSession(null);
     setMessage(null);
-
-    const r = await pousserFaits(
-      config, session, faitsLocaux, VERSION_SCHEMA, versionAttendue
-    );
-    setEnCours(false);
-
-    if (r.statut === 'erreur') { setErreur(r.motif); return; }
-    if (r.statut === 'conflit') {
-      setDistant(r.distant);
-      setEtat({ phase: 'conflit', session, distant: r.distant });
-      return;
-    }
-    setDistant(r.instantane);
-    setEtat({ phase: 'connecte', session });
-    setMessage('Données de cet appareil enregistrées sur le compte.');
+    allerA(3);
   }
 
-  /* ── Récupérer ───────────────────────────────────────────────────────── */
+  const attente = <p className={styles.consequence}>Chargement…</p>;
+  const statut = message !== null && <p role="status" className={styles.succes}>{message}</p>;
 
-  async function recuperer(session: Session): Promise<void> {
-    setEnCours(true);
-    setErreur(null);
-    setMessage(null);
-
-    const instantane = await relireEtatDistant(session);
-    setEnCours(false);
-    if (instantane === null) {
-      setMessage('Ce compte ne contient encore aucune donnée de cette version.');
-      return;
-    }
-
-    // Un bloc écrit par une version plus récente est refusé ici, avant tout
-    // remplacement : le charger reviendrait à effacer ce que ce code ne sait
-    // pas lire dès le premier renvoi.
-    const motif = motifRefusExterieur(instantane.faits);
-    if (motif !== null) { setErreur(motif); return; }
-
-    setEtat({
-      phase: 'apercu-distant', session, instantane, faits: completerFaits(instantane.faits)
-    });
-  }
-
-  async function confirmerRecuperation(session: Session, faits: Faits): Promise<void> {
-    const motif = await adopterFaitsDistants(faits);
-    if (motif !== null) { setErreur(motif); return; }
-    setEtat({ phase: 'connecte', session });
-    setMessage('Données du compte chargées. Elles remplacent l’état de cet appareil.');
-  }
-
-  /* ── Ancienne application ────────────────────────────────────────────── */
-
-  async function apercevoirLegacy(session: Session): Promise<void> {
-    if (config === null) return;
-    setEnCours(true);
-    setErreur(null);
-    setMessage(null);
-
-    const r = await chargerDonneesLegacy(config, session);
-    setEnCours(false);
-    if (r.statut === 'erreur') { setErreur(r.motif); return; }
-    if (r.valeur === null) {
-      setMessage('Ce compte ne contient aucune donnée de l’ancienne application.');
-      return;
-    }
-    const { rapport } = convertirBundle(bundleDepuisLegacy(r.valeur));
-    setEtat({ phase: 'apercu-legacy', session, donnees: r.valeur, rapport });
-  }
-
-  async function confirmerLegacy(donnees: DonneesLegacy, session: Session): Promise<void> {
-    const refus = await remplacerParBundle(bundleDepuisLegacy(donnees));
-    setEtat({ phase: 'connecte', session });
-    if (refus !== null) { setErreur(refus); return; }
-    setMessage('Données de l’ancienne application chargées sur cet appareil.');
-  }
-
-  /**
-   * Efface du compte l'une des deux copies, et dit ce que la relecture a
-   * constaté — jamais ce que le serveur a simplement accepté.
-   */
-  async function effacer(session: Session, quoi: 'faits' | 'legacy'): Promise<void> {
-    if (config === null) return;
-    setEnCours(true);
-    setErreur(null);
-    setMessage(null);
-    setEffacement(null);
-    const r: ResultatEffacement = quoi === 'faits'
-      ? await effacerFaitsDuCompte(config, session)
-      : await effacerDonneesLegacy(config, session);
-    if (quoi === 'faits') await relireEtatDistant(session);
-    setEnCours(false);
-    const copie = quoi === 'faits' ? 'de cette version' : 'de l’ancienne application';
-    switch (r.statut) {
-      case 'efface':
-        // Les états précédents partent avec la copie de cette version : le
-        // dire, sinon on croirait qu'ils restent, prêts à la ramener.
-        setEffacement({
-          echec: false,
-          texte: quoi === 'faits'
-            ? 'Données de cette version et états précédents effacés du compte. Relu après coup : il n’en reste rien.'
-            : `Données ${copie} effacées du compte. Relu après coup : il n’en reste rien.`
-        });
-        return;
-      case 'deja-vide':
-        setEffacement({ echec: false, texte: `Le compte ne contenait aucune donnée ${copie} : rien à effacer.` });
-        return;
-      case 'regle-absente':
-        setEffacement({
-          echec: true,
-          texte: 'Rien n’a été effacé : le serveur n’autorise pas encore la suppression. '
-            + 'Ouvre le fichier « docs/supabase.sql » du dépôt, copie son CONTENU dans '
-            + 'l’éditeur SQL du projet Supabase, exécute-le, puis réessaie.'
-        });
-        return;
-      case 'erreur':
-        setEffacement({ echec: true, texte: r.motif });
-    }
-  }
-
-  async function deconnecter(session: Session): Promise<void> {
-    if (config !== null) await seDeconnecter(config, session);
-    ecrireSession(local, null);
-    setEtat({ phase: 'deconnecte' });
-    setDistant('inconnu');
-    setMessage('Déconnecté. Tes données restent sur cet appareil : « Effacer cet appareil », '
-      + 'dans Réglages › Données & export, les en retire.');
-  }
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-titre`}>
-      <h2 id={`${idChamp}-titre`} className={styles.titreCarte}>
-        Compte et synchronisation
-        <Info libelle="Ce que fait la connexion au compte">
-          Elle enregistre et relit les données de cette version dans une table
-          qui lui est propre. <strong>Les données de l’ancienne application ne
-          sont jamais modifiées</strong>, sauf si tu demandes leur effacement&nbsp;:
-          la reprise s’en sert, et l’ancienne version les affiche encore, en
-          lecture seule.
-        </Info>
-      </h2>
-
-      {/* Le projet relié se dit, et se change. Sans cette ligne, une adresse
-          enregistrée par erreur ne se corrigeait plus : l'écran ne montrait que
-          courriel et mot de passe, et chaque connexion échouait sans que rien
-          n'indique où (21/11). On ne change de projet que déconnecté : une
-          session ouverte appartient au projet d'avant. */}
-      {etat.phase === 'deconnecte' && (
-        <p className={styles.explication}>
-          Projet relié&nbsp;: <strong>{new URL(config.url).host}</strong>
-          {configDeBuild() === null && (
-            <>
-              {' '}
-              <button type="button" className={styles.action} onClick={() => {
-                ecrireConfig(local, null);
-                setErreur(null);
-                setConfig(null);
-              }}>Changer de projet</button>
-            </>
-          )}
-        </p>
-      )}
-
-      {etat.phase === 'deconnecte' && (
-        <FormulaireConnexion idChamp={idChamp} enCours={enCours} onConnecter={connecter} />
-      )}
-
-      {etat.phase !== 'deconnecte' && (
-        <>
-          <dl className={styles.detail}>
-            <div className={styles.ligne}>
-              <dt>Connecté</dt>
-              <dd>{etat.session.email}</dd>
-            </div>
-            <div className={styles.ligne}>
-              <dt>Serveur</dt>
-              <dd className={styles.url}>{config.url}</dd>
-            </div>
-          </dl>
-
-          {etat.phase === 'connecte' && (
-            <>
-              <EtatDuCompte distant={distant} local={resumer(faitsLocaux)} />
-              <ul className={styles.operations}>
-                <li className={styles.operation}>
-                  <button
-                    type="button"
-                    className={styles.actionPrincipale}
-                    disabled={enCours || distant === 'inconnu' || motifRefusEnvoi(distant) !== null}
-                    onClick={() => void demanderEnvoi(etat.session)}
-                  >
-                    {enCours ? 'Envoi…' : 'Enregistrer cet appareil sur le compte'}
-                  </button>
-                  <p className={styles.consequence}>
-                    Envoie ce que contient <strong>cet appareil</strong>
-                    {' '}({resumeCourt(resumer(faitsLocaux))}) vers le compte, en
-                    remplacement de ce qui s’y trouve.
-                  </p>
-                </li>
-
-                <li className={styles.operation}>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={enCours}
-                    onClick={() => void recuperer(etat.session)}
-                  >
-                    Charger le compte sur cet appareil
-                  </button>
-                  <p className={styles.consequence}>
-                    Sens inverse&nbsp;: ce qui est sur <strong>le compte</strong>
-                    {' '}remplacera ce que contient cet appareil.
-                  </p>
-                </li>
-
-                <li className={styles.operation}>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={enCours}
-                    onClick={() => void apercevoirLegacy(etat.session)}
-                  >
-                    Reprendre les données de l’ancienne application
-                  </button>
-                  <p className={styles.consequence}>
-                    Lit la table de <strong>l’ancienne version</strong> et la
-                    convertit. Elle n’est pas modifiée&nbsp;: l’ancienne
-                    application reste consultable, en lecture seule.
-                  </p>
-                </li>
-
-                <li className={styles.secondaires}>
-                  <button
-                    type="button"
-                    className={styles.action}
-                    onClick={() => void deconnecter(etat.session)}
-                  >
-                    Se déconnecter
-                  </button>
-                  <button
-                    ref={boutonEffacer}
-                    type="button"
-                    className={styles.action}
-                    aria-expanded={effacerOuvert}
-                    onClick={() => setEffacerOuvert(true)}
-                  >
-                    Se déconnecter et effacer cet appareil
-                  </button>
-                  {/* Lot 59 (S7) : se déconnecter laissait tout sur l'appareil, sans le dire. */}
-                  <p className={styles.consequence}>
-                    Se déconnecter laisse tes données et tes pièces sur cet
-                    appareil, lisibles par qui l’ouvre.
-                  </p>
-                </li>
-              </ul>
-              {effacerOuvert && (
-                <PanneauEffacerAppareil
-                  classes={{ action: styles.action, succes: styles.succes, echec: styles.echec }}
-                  onGarder={() => { setEffacerOuvert(false); boutonEffacer.current?.focus(); }}
-                />
-              )}
-
-              <EtatsPrecedents
-                config={config}
-                session={etat.session}
-                distant={distant}
-                desactive={enCours}
-                onCompteModifie={(i) => {
-                  if (i !== null) setDistant(i);
-                  else void relireEtatDistant(etat.session);
-                }}
-              />
-
-              {/*
-                * LE DROIT À L'EFFACEMENT, DEPUIS L'APPLICATION.
-                *
-                * « Repartir de zéro » ne vidait que ce navigateur : les données
-                * restaient sur le compte, et rien ne disait comment les en
-                * retirer. Chaque copie s'efface à part — celle de l'ancienne
-                * application sert encore à la reprise —, et l'effacement se
-                * PROUVE en relisant : un serveur sans règle de suppression
-                * répond « succès » sans rien effacer.
-                */}
-              <h3 className={styles.sousTitre}>Effacer mes données du compte</h3>
-              <ul className={styles.operations}>
-                <li className={styles.operation}>
-                  <ConfirmationSurPlace
-                    libelle="Effacer la copie de cette version"
-                    classeDeclencheur={styles.action}
-                    desactive={enCours}
-                    consequence={(
-                      <>
-                        La copie de cette version enregistrée sur le compte, et
-                        ses états précédents, seront effacés, puis relus pour le
-                        prouver. Rien ne les ramène,
-                        sinon un nouvel envoi depuis un appareil. Cet appareil
-                        garde ses données&nbsp;: une sauvegarde JSON (Données)
-                        d’abord reste prudente.
-                      </>
-                    )}
-                    libelleConfirmer="Effacer du compte"
-                    onConfirmer={() => void effacer(etat.session, 'faits')}
-                  />
-                </li>
-                <li className={styles.operation}>
-                  <ConfirmationSurPlace
-                    libelle="Effacer les données de l’ancienne application"
-                    classeDeclencheur={styles.action}
-                    desactive={enCours}
-                    consequence={(
-                      <>
-                        Les données de l’ancienne application enregistrées sur le
-                        compte seront effacées, puis relues pour le prouver. Fais
-                        d’abord la reprise si tu en as besoin&nbsp;: ensuite, le
-                        compte n’aura plus rien à reprendre.
-                      </>
-                    )}
-                    libelleConfirmer="Effacer du compte"
-                    onConfirmer={() => void effacer(etat.session, 'legacy')}
-                  />
-                </li>
-              </ul>
-              {effacement !== null && (
-                <p role={effacement.echec ? 'alert' : 'status'} className={effacement.echec ? styles.echec : styles.succes}>
-                  {effacement.texte}
-                </p>
-              )}
-              <p className={styles.explication}>
-                Ton <strong>identifiant de connexion</strong> n’est pas supprimé
-                par ces gestes&nbsp;: il se supprime dans le tableau de bord du
-                projet Supabase (Authentication, puis Users). C’est le seul
-                endroit où la clé de service — celle qui permet tout — a sa
-                place&nbsp;; elle n’en a aucune dans une page servie à tous.
-                Les données de <strong>cet appareil</strong> s’effacent avec
-                «&nbsp;Se déconnecter et effacer cet appareil&nbsp;», plus haut.
-              </p>
-            </>
-          )}
-
-          {etat.phase === 'confirmer-envoi' && (
-            <ConfirmerEnvoi
-              motif={etat.motif}
-              distant={etat.distant}
-              onConfirmer={() => void envoyer(etat.session, etat.distant.version)}
-              onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
-            />
-          )}
-
-          {etat.phase === 'apercu-legacy' && (
-            <Apercu
-              titre="Données de l’ancienne application"
-              rapport={etat.rapport}
-              majLe={etat.donnees.updated_at}
-              onConfirmer={() => void confirmerLegacy(etat.donnees, etat.session)}
-              onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
-            />
-          )}
-
-          {etat.phase === 'apercu-distant' && (
-            <ApercuDistant
-              resume={resumer(etat.faits)}
-              majLe={etat.instantane.majLe}
-              onConfirmer={() => void confirmerRecuperation(etat.session, etat.faits)}
-              onAnnuler={() => setEtat({ phase: 'connecte', session: etat.session })}
-            />
-          )}
-
-          {etat.phase === 'conflit' && (
-            <Conflit
-              distant={etat.distant}
-              local={resumer(faitsLocaux)}
-              enCours={enCours}
-              onEcraser={() => void envoyer(etat.session, etat.distant?.version ?? null)}
-              onAbandonner={() => {
-                setEtat({ phase: 'connecte', session: etat.session });
-                setMessage('Envoi abandonné. Rien n’a été modifié sur le compte.');
-              }}
-            />
-          )}
-        </>
-      )}
-
-      <ReglesDAcces config={config} />
-
-      {erreur !== null && <p role="alert" className={styles.echec}>{erreur}</p>}
-      {message !== null && <p role="status" className={styles.succes}>{message}</p>}
-    </section>
-  );
-}
-
-/**
- * Où en est le compte par rapport à cet appareil.
- *
- * Sans ce repère, « Envoyer » et « Récupérer » sont deux boutons qu'on
- * actionne au hasard, dont l'un écrase toujours quelque chose.
- */
-function EtatDuCompte({ distant, local }: { distant: EtatDistant; local: Resume }) {
-  if (distant === 'inconnu') {
-    return (
-      <p className={styles.avertissement}>
-        L’état du compte n’a pas pu être lu. L’envoi reste indisponible tant
-        qu’on ignore ce qu’il contient&nbsp;: écrire sans le savoir pourrait
-        recouvrir des données sans que rien ne l’annonce.
-      </p>
-    );
-  }
-
-  const refus = motifRefusEnvoi(distant);
-  if (refus !== null) return <p className={styles.avertissement}>{refus}</p>;
-
-  if (distant === null) {
-    return (
-      <p className={styles.explication}>
-        Ce compte ne contient encore rien pour cette version. Le premier envoi
-        y déposera les {local.recettes} recette(s) et {local.depenses} dépense(s)
-        de cet appareil.
-      </p>
-    );
-  }
-
-  return (
-    <dl className={styles.detail}>
-      <div className={styles.ligne}>
-        <dt>Compte enregistré le</dt>
-        <dd>{distant.majLe === null ? '—' : dateCourte(distant.majLe.slice(0, 10))}</dd>
-      </div>
-      <div className={styles.ligne}>
-        <dt>Cet appareil</dt>
-        <dd>{local.recettes} recette(s), {local.depenses} dépense(s)</dd>
-      </div>
-    </dl>
-  );
-}
-
-/**
- * Envoyer un appareil vide sur un compte qui contient quelque chose.
- *
- * Rien d'anormal du point de vue du serveur : la version est la bonne,
- * l'écriture passerait. C'est l'INTENTION qui est douteuse, et seule une
- * personne peut la confirmer.
- */
-function ConfirmerEnvoi(
-  { motif, distant, onConfirmer, onAnnuler }: {
-    motif: MotifDeConfirmation;
-    distant: InstantaneDistant;
-    onConfirmer: () => void;
-    onAnnuler: () => void;
-  }
-) {
-  const cote = resumeDistant(distant);
-  const contenuDuCompte = cote === null
-    ? '.'
-    : ` — ${cote.recettes} recette(s), ${cote.depenses} dépense(s), `
-      + `${cote.clients} client(s).`;
-
-  return (
-    <div className={styles.apercu}>
-      {motif === 'appareil-vide'
-        ? (
-          <p className={styles.avertissement}>
-            Cet appareil ne contient <strong>aucune donnée</strong>. L’envoyer
-            effacerait ce que le compte contient{contenuDuCompte}
-          </p>
-        )
-        : (
-          /*
-           * LE DANGER SE NOMME, SINON IL NE SE VOIT PAS.
-           *
-           * L'écran est plein de factures : rien n'y ressemble à une perte de
-           * données. Il faut donc dire que ces factures sont FICTIVES, et ce
-           * que l'envoi ferait des vraies.
-           */
-          <p className={styles.avertissement}>
-            Cet appareil contient le <strong>jeu de démonstration</strong> —
-            des clients et des factures fictifs. L’envoyer remplacerait le
-            contenu du compte{contenuDuCompte}
-          </p>
-        )}
-      <p className={styles.consequence}>
-        Si tu voulais au contraire récupérer ces données ici, reviens en
-        arrière et choisis <em>Charger le compte sur cet appareil</em>, ou
-        <em> Reprendre les données de l’ancienne application</em>.
-      </p>
-      <div className={styles.actions}>
-        <button type="button" className={styles.action} onClick={onConfirmer}>
-          {motif === 'appareil-vide'
-            ? 'Effacer quand même le compte'
-            : 'Remplacer quand même le compte'}
-        </button>
-        <button type="button" className={styles.actionPrincipale} onClick={onAnnuler}>
-          Revenir en arrière
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Le compte a bougé entre la lecture et l'envoi.
- *
- * Aucune fusion automatique n'est tentée. Réunir deux jeux d'écritures
- * comptables demande de savoir, ligne à ligne, laquelle fait foi ; le deviner
- * produirait un registre que personne n'a validé. On présente donc les deux
- * états et on laisse choisir — en disant ce que chaque choix efface.
- */
-function Conflit(
-  { distant, local, enCours, onEcraser, onAbandonner }: {
-    distant: InstantaneDistant | null;
-    local: Resume;
-    enCours: boolean;
-    onEcraser: () => void;
-    onAbandonner: () => void;
-  }
-) {
-  const lisible = distant !== null && motifRefusExterieur(distant.faits) === null;
-  const cote = lisible && distant !== null ? resumer(completerFaits(distant.faits)) : null;
-  // Le conflit peut révéler qu'un appareil plus récent a écrit entre-temps :
-  // « écraser » retomberait alors exactement dans le cas que l'envoi refuse.
-  const refus = motifRefusEnvoi(distant);
-
-  return (
-    <div className={styles.apercu}>
-      <p className={styles.avertissement}>
-        Le compte a été modifié depuis la dernière lecture, sans doute par un
-        autre appareil. <strong>Rien n’a été enregistré</strong>&nbsp;: écraser
-        ces modifications sans les montrer les aurait fait disparaître en
-        silence.
-      </p>
-
-      <dl className={styles.detail}>
-        <div className={styles.ligne}>
-          <dt>Cet appareil</dt>
-          <dd>{local.recettes} recette(s), {local.depenses} dépense(s)</dd>
-        </div>
-        <div className={styles.ligne}>
-          <dt>Le compte</dt>
-          <dd>
-            {cote === null
-              ? 'contenu illisible'
-              : `${cote.recettes} recette(s), ${cote.depenses} dépense(s)`}
-          </dd>
-        </div>
-        {distant?.majLe != null && (
-          <div className={styles.ligne}>
-            <dt>Enregistré le</dt>
-            <dd>{dateCourte(distant.majLe.slice(0, 10))}</dd>
-          </div>
-        )}
-      </dl>
-
-      {refus !== null && <p className={styles.avertissement}>{refus}</p>}
-
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.action}
-          disabled={enCours || refus !== null}
-          onClick={onEcraser}
-        >
-          Écraser le compte avec cet appareil
-        </button>
-        <button type="button" className={styles.actionPrincipale} onClick={onAbandonner}>
-          Abandonner l’envoi
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Ce qui serait chargé depuis la table de cette version. */
-function ApercuDistant(
-  { resume, majLe, onConfirmer, onAnnuler }: {
-    resume: Resume;
-    majLe: string | null;
-    onConfirmer: () => void;
-    onAnnuler: () => void;
-  }
-) {
-  return (
-    <div className={styles.apercu}>
-      <p className={styles.avertissement}>
-        Ces données <strong>remplaceront</strong> l’état actuel de cet appareil.
-        Ce qui n’a pas été envoyé sur le compte sera perdu.
-      </p>
-
-      <dl className={styles.detail}>
-        {majLe !== null && (
-          <div className={styles.ligne}>
-            <dt>Enregistré le</dt>
-            <dd>{dateCourte(majLe.slice(0, 10))}</dd>
-          </div>
-        )}
-        <div className={styles.ligne}><dt>Clients</dt><dd>{resume.clients}</dd></div>
-        <div className={styles.ligne}><dt>Missions</dt><dd>{resume.missions}</dd></div>
-        <div className={styles.ligne}><dt>Recettes</dt><dd>{resume.recettes}</dd></div>
-        <div className={styles.ligne}><dt>Dépenses</dt><dd>{resume.depenses}</dd></div>
-      </dl>
-
-      <div className={styles.actions}>
-        <button type="button" className={styles.actionPrincipale} onClick={onConfirmer}>
-          Remplacer les données de cet appareil
-        </button>
-        <button type="button" className={styles.action} onClick={onAnnuler}>
-          Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Ce qui serait chargé depuis l'ancienne application.
- *
- * Le même rapport que la migration locale : nombres par entité, anomalies, et
- * champs sans destination. Un chargement qui ne dit rien de ce qu'il apporte
- * ne permet pas de constater une perte.
- */
-function Apercu(
-  { titre, rapport, majLe, onConfirmer, onAnnuler }: {
-    titre: string;
-    rapport: RapportMigration;
-    majLe: string | null;
-    onConfirmer: () => void;
-    onAnnuler: () => void;
-  }
-) {
-  const { comptes } = rapport;
-  return (
-    <div className={styles.apercu}>
-      <p className={styles.avertissement}>
-        {titre} — elles <strong>remplaceront</strong> l’état actuel de cet
-        appareil. Ce qui n’a pas été enregistré sur le compte sera perdu.
-      </p>
-
-      <dl className={styles.detail}>
-        {majLe !== null && (
-          <div className={styles.ligne}>
-            <dt>Enregistré le</dt>
-            <dd>{dateCourte(majLe.slice(0, 10))}</dd>
-          </div>
-        )}
-        <div className={styles.ligne}><dt>Clients</dt><dd>{comptes.clients}</dd></div>
-        <div className={styles.ligne}><dt>Missions</dt><dd>{comptes.missions}</dd></div>
-        <div className={styles.ligne}><dt>Recettes</dt><dd>{comptes.recettes}</dd></div>
-        <div className={styles.ligne}><dt>Dépenses</dt><dd>{comptes.depenses}</dd></div>
-      </dl>
-
-      {rapport.anomalies.length > 0 && (
-        <details className={styles.repli}>
-          <summary>{rapport.anomalies.length} point(s) à connaître</summary>
-          <ul className={styles.anomalies}>
-            {rapport.anomalies.slice(0, 15).map((a, i) => (
-              <li key={`${a.gravite}-${i}`}>{a.message}</li>
-            ))}
-            {rapport.anomalies.length > 15 && (
-              <li>…et {rapport.anomalies.length - 15} autre(s).</li>
-            )}
-          </ul>
-        </details>
-      )}
-
-      <div className={styles.actions}>
-        <button type="button" className={styles.actionPrincipale} onClick={onConfirmer}>
-          Remplacer les données de cet appareil
-        </button>
-        <button type="button" className={styles.action} onClick={onAnnuler}>
-          Annuler
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FormulaireConnexion(
-  { idChamp, enCours, onConnecter }: {
-    idChamp: string;
-    enCours: boolean;
-    onConnecter: (email: string, motDePasse: string) => Promise<void>;
-  }
-) {
-  const [email, setEmail] = useState('');
-  const [motDePasse, setMotDePasse] = useState('');
-
-  return (
-    <form
-      className={styles.formulaire}
-      onSubmit={(e) => { e.preventDefault(); void onConnecter(email, motDePasse); }}
-    >
-      <p className={styles.champ}>
-        <label htmlFor={`${idChamp}-email`}>Adresse électronique</label>
-        <input id={`${idChamp}-email`} type="email" autoComplete="username"
-          value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </p>
-      <p className={styles.champ}>
-        <label htmlFor={`${idChamp}-mdp`}>Mot de passe</label>
-        <input id={`${idChamp}-mdp`} type="password" autoComplete="current-password"
-          value={motDePasse} onChange={(e) => setMotDePasse(e.target.value)} required />
-      </p>
-      <button type="submit" className={styles.actionPrincipale} disabled={enCours}>
-        {enCours ? 'Connexion…' : 'Se connecter'}
-      </button>
-    </form>
-  );
-}
-
-/**
- * Saisie de l'adresse du projet.
- *
- * Ni l'adresse ni la clé ne figurent dans le code : l'adresse d'un projet
- * désigne le compte de quelqu'un et n'a rien à faire dans un dépôt public. La
- * clé « anon », elle, est publique par conception — la protection vient des
- * règles RLS du serveur, pas de son secret.
- */
-function SaisieConfig(
-  { idChamp, onValider }: { idChamp: string; onValider: (c: ConfigSupabase) => void }
-) {
-  const [url, setUrl] = useState('');
-  const [cle, setCle] = useState('');
-  /* Une adresse en http était enregistrée telle quelle, puis refusée à la
-     relecture : l'écran de saisie revenait sans un mot. Le refus se dit ici,
-     avant d'enregistrer. */
-  const [refus, setRefus] = useState<string | null>(null);
-
-  return (
-    <section className={styles.carte} aria-labelledby={`${idChamp}-config`}>
-      <h2 id={`${idChamp}-config`} className={styles.titreCarte}>
-        Relier un compte
-        <Info libelle="Où trouver ces informations">
-          Dans le tableau de bord Supabase, réglages du projet&nbsp;: l’adresse du
-          projet (de la forme <em>https://identifiant.supabase.co</em>) et la clé
-          publique <em>anon</em>. Cette clé est faite pour être publique&nbsp;; ce
-          qui protège les données, ce sont les règles d’accès définies sur le
-          serveur. La base doit être préparée une fois&nbsp;: copie le
-          <strong> contenu</strong> du fichier <em>docs/supabase.sql</em> du dépôt
-          dans l’éditeur SQL du projet, et exécute-le.
-        </Info>
-      </h2>
-
-      <p className={styles.explication}>
-        {configDeBuild() === null
-          ? 'Aucun projet n’est relié à cet appareil. Trois étapes : l’adresse du projet et sa clé '
-            + 'publique ici, puis ton courriel et ton mot de passe à l’écran suivant.'
-          : 'Un compte est configuré à la compilation.'}
-      </p>
-
-      <form
-        className={styles.formulaire}
-        onSubmit={(e) => {
-          e.preventDefault();
-          const motif = motifUrlRefusee(url.trim());
-          setRefus(motif);
-          if (motif === null) onValider({ url: adresseDuProjet(url), cleAnon: cle.trim() });
+  let vue;
+  if (retour !== null) {
+    vue = (
+      <RetourDuLien
+        config={config}
+        stockage={local}
+        retour={retour}
+        onSession={(s, motif, texte) => {
+          seConnecte(s, texte);
+          // Une inscription confirmée : il reste à fermer la porte.
+          if (motif === 'inscription' && !projetFixe) allerA(5);
         }}
-      >
-        {refus !== null && <p className={styles.echec} role="alert">{refus}</p>}
-        <p className={styles.champ}>
-          <label htmlFor={`${idChamp}-url`}>Adresse du projet</label>
-          <input id={`${idChamp}-url`} type="url" placeholder="https://exemple.supabase.co"
-            value={url} onChange={(e) => setUrl(e.target.value)} required />
+        onFini={() => { oublierRetourDuLien(); setRetour(null); }}
+      />
+    );
+  } else if (etape !== null) {
+    vue = (
+      <Guide
+        etape={etape}
+        onEtape={allerA}
+        config={config}
+        onConfig={relier}
+        stockage={local}
+        session={session}
+        onSession={seConnecte}
+        onQuitter={() => allerA(null)}
+        {...(verifier === undefined ? {} : { verifier })}
+      />
+    );
+  } else if (config === null) {
+    vue = <Accueil onGuider={() => allerA(1)} onDejaProjet={() => allerA(3)} />;
+  } else if (!repriseFaite) {
+    vue = <p className={styles.consequence}>Lecture de la session…</p>;
+  } else if (session === null) {
+    vue = (
+      <div className={styles.pile}>
+        <TonCompte
+          titre="Ton compte"
+          config={config}
+          stockage={local}
+          onSession={seConnecte}
+          entete={(
+            <p className={styles.explication}>
+              Projet relié&nbsp;: <strong className={styles.mono}>{new URL(config.url).host}</strong>
+            </p>
+          )}
+        />
+        <SanteDuProjet
+          config={config}
+          {...(verifier === undefined ? {} : { verifier })}
+          pied={!projetFixe && (
+            <button type="button" className={styles.action} onClick={oublierProjet}>Changer de projet</button>
+          )}
+        />
+      </div>
+    );
+  } else {
+    const relie = config;
+    vue = (
+      <Relie
+        config={relie}
+        session={session}
+        local={local}
+        projetFixe={projetFixe}
+        onDeconnecte={(texte) => { setSession(null); setMessage(texte); }}
+        onChangerDeProjet={oublierProjet}
+        sante={(pied, suite) => (
+          <SanteDuProjet config={relie} pied={pied} suite={suite} {...(verifier === undefined ? {} : { verifier })} />
+        )}
+      />
+    );
+  }
+
+  return (
+    <div className={styles.pile}>
+      <Suspense fallback={attente}>{vue}</Suspense>
+      {statut}
+    </div>
+  );
+}
+
+/**
+ * Rien n'est relié (maquette, état 1) : le pourquoi, en une phrase, et deux
+ * portes. Plus de champs techniques d'emblée.
+ */
+function Accueil({ onGuider, onDejaProjet }: { onGuider: () => void; onDejaProjet: () => void }) {
+  const id = useId();
+  return (
+    <div className={styles.pile}>
+      <section className={styles.carte} aria-labelledby={`${id}-relier`}>
+        <h3 id={`${id}-relier`} className={styles.titreCarte}>Tes données sont sur cet appareil</h3>
+        <p className={styles.explication}>
+          Si ce navigateur est effacé, elles partent avec lui. Pour les
+          {' '}<strong>sauvegarder</strong> et les retrouver <strong>sur ton
+          téléphone</strong>, relie FREEL à ton propre espace Supabase&nbsp;:
+          gratuit, à ton nom. FREEL n’y a pas accès, et personne d’autre.
         </p>
-        <p className={styles.champ}>
-          <label htmlFor={`${idChamp}-cle`}>Clé publique (anon)</label>
-          <input id={`${idChamp}-cle`} value={cle}
-            onChange={(e) => setCle(e.target.value)} required />
+        <div className={styles.choix}>
+          <button type="button" className={`${styles.actionPrincipale} ${styles.actionVerte} ${styles.pleineLargeur}`}
+            onClick={onGuider}>
+            Me guider pas à pas
+          </button>
+          <button type="button" className={`${styles.actionPrincipale} ${styles.pleineLargeur}`} onClick={onDejaProjet}>
+            J’ai déjà un projet Supabase
+          </button>
+        </div>
+      </section>
+      <section className={styles.carte} aria-labelledby={`${id}-sans`}>
+        <h3 id={`${id}-sans`} className={styles.titreCarte}>Sans compte</h3>
+        <p className={styles.explication}>
+          Une sauvegarde en fichier, à ranger où tu veux (ton Drive, une clé USB).
         </p>
-        <button type="submit" className={styles.actionPrincipale}>Enregistrer</button>
-      </form>
-    </section>
+        <a className={styles.lien} href="#/reglages/donnees">Réglages › Données &amp; export ›</a>
+      </section>
+    </div>
   );
 }

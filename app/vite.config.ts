@@ -1,10 +1,25 @@
 // Depuis `vitest/config` et non `vite` : à partir de vitest 4, la clé `test`
 // n'est plus connue du type de Vite, et le typage refusait la configuration.
 import { defineConfig } from 'vitest/config';
+import { searchForWorkspaceRoot } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    fs: {
+      /*
+       * Le guide de l'écran Compte copie `docs/supabase.sql`, importé tel quel
+       * (`?raw`) pour qu'il n'en existe qu'une source. Le fichier est hors de
+       * `app/` : le serveur de développement (et Vitest) le refusaient. Le
+       * DOSSIER, pas le fichier : Vite contrôle l'identifiant avec sa requête
+       * (`supabase.sql?raw`), qu'une entrée de fichier ne couvre jamais —
+       * essayé, « Denied ID ». `docs/` est public, comme tout le dépôt ; seul
+       * le serveur local s'en trouve ouvert, le build n'en dépend pas.
+       */
+      allow: [searchForWorkspaceRoot(process.cwd()), '../docs']
+    }
+  },
   // L'application est servie depuis un sous-chemin sur GitHub Pages ;
   // les chemins relatifs évitent d'avoir à connaître la base au build.
   base: './',
