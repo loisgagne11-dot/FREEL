@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useConfidentialite } from '../useConfidentialite';
 import { type StockageLocal, lireSession, sessionValide } from '../../infra/session';
 import styles from './PastillesSysteme.module.css';
@@ -95,6 +96,17 @@ export function PastillesSysteme() {
  */
 function PastilleCloud() {
   const etat = etatDuCompte();
+  const relie = etat.ton !== 'local';
+  /*
+   * La synchronisation automatique démarre ici, et pas dans `main.tsx` : le
+   * paquet d'entrée est à 79,67 Ko sur 80, et cette barre est déjà différée.
+   * Elle arrive après le premier rendu, sur tous les écrans, et seulement si
+   * une session existe — qui n'a jamais relié de compte ne télécharge rien.
+   */
+  useEffect(() => {
+    if (!relie) return;
+    void import('../../infra/synchro.moteur').then((m) => m.demarrerSynchroAutomatique(), () => undefined);
+  }, [relie]);
   return (
     <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/reglages/compte" title={etat.detail}>
       <span className={styles.etiquette} data-role="libelle-synchro">

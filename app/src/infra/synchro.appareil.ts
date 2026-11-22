@@ -18,10 +18,12 @@
  * compte ne dit rien de celui-ci, et la prendre pour la sienne ferait
  * « recevoir » ou « envoyer » à tort après un changement de projet.
  *
- * Un module minuscule, sans dépendance : la barre du haut le lit pour écrire
- * « Synchronisé à 9 h 41 », et elle n'a rien d'autre à télécharger pour cela.
+ * Un module minuscule — l'empreinte pour seule dépendance : la barre du haut
+ * le lit pour écrire « Synchronisé à 9 h 41 », et elle n'a rien d'autre à
+ * télécharger pour cela.
  */
 import type { StockageLocal } from './session';
+import { empreinte } from '../state/synchro.empreinte';
 
 /** Clé versionnée : une forme future se reconnaîtra, et celle-ci ne la lira pas de travers. */
 export const CLE_SYNCHRO = 'freel.synchro.appareil.v1' as const;
@@ -68,6 +70,25 @@ export function lireBase(stockage: StockageLocal, compte: string): BaseSynchro |
   } catch {
     return null;
   }
+}
+
+/**
+ * Retient une synchronisation qui vient de RÉUSSIR : envoi accepté, compte
+ * adopté, ou les deux côtés constatés identiques.
+ *
+ * `faits` sont ceux de cet appareil À CE MOMENT — ceux qu'on vient d'envoyer,
+ * ou ceux que l'adoption a posés. C'est leur empreinte qui dira ensuite
+ * « modifié depuis » ; prise sur autre chose, une adoption compterait comme
+ * une modification, et repartirait aussitôt vers le compte.
+ */
+export function noterSynchronisation(
+  stockage: StockageLocal, compte: string, version: number, faits: unknown, maintenant: Date = new Date()
+): BaseSynchro {
+  const base: BaseSynchro = {
+    compte, version, le: maintenant.toISOString(), empreinte: empreinte(faits), modifieLe: null
+  };
+  ecrireBase(stockage, base);
+  return base;
 }
 
 export function ecrireBase(stockage: StockageLocal, base: BaseSynchro | null): void {

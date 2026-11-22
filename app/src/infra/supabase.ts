@@ -565,7 +565,18 @@ export type ResultatEcriture =
     /** L'état distant au moment du refus, ou `null` s'il n'a pas pu être relu. */
     readonly distant: InstantaneDistant | null;
   }
-  | { readonly statut: 'erreur'; readonly motif: string };
+  | {
+    readonly statut: 'erreur';
+    readonly motif: string;
+    /**
+     * Repris de `Resultat` (lot 42) : la synchronisation automatique doit
+     * distinguer une coupure — on réessaie au retour du réseau — d'un jeton
+     * refusé — on demande de se reconnecter. Sur le seul texte du motif, elle
+     * aurait réessayé indéfiniment une session morte.
+     */
+    readonly code?: number;
+    readonly panne?: 'reseau' | 'delai';
+  };
 
 export function instantaneDepuis(ligne: Record<string, unknown>): InstantaneDistant {
   const version = ligne['version'];
@@ -643,7 +654,13 @@ export async function pousserFaits(
   session: Session,
   faits: unknown,
   schema: number,
-  versionAttendue: number | null
+  versionAttendue: number | null,
+  /**
+   * `keepalive` : la requête survit à la fermeture de la page (lot 42, envoi
+   * en partant). Le navigateur la plafonne à 64 Kio de corps : c'est à
+   * l'appelant de ne la demander que pour un dossier qui y tient.
+   */
+  options: { readonly keepalive?: boolean } = {}
 ): Promise<ResultatEcriture> {
   const commun = {
     faits,
@@ -652,25 +669,32 @@ export async function pousserFaits(
     maj_le: new Date().toISOString()
   };
   const entete = { Prefer: 'return=representation' };
+  const garder = options.keepalive === true ? { keepalive: true } : {};
 
   const r = versionAttendue === null
     ? await appeler(config, `/rest/v1/${TABLE_FAITS}`, {
       method: 'POST',
       jeton: session.jeton,
       headers: entete,
-      body: JSON.stringify({ ...commun, user_id: session.utilisateurId, version: 1 })
+      body: JSON.stringify({ ...commun, user_id: session.utilisateurId, version: 1 }),
+      ...garder
     })
     : await appeler(config, `${cheminDuCompte(session)}&version=eq.${versionAttendue}`, {
       method: 'PATCH',
       jeton: session.jeton,
       headers: entete,
-      body: JSON.stringify({ ...commun, version: versionAttendue + 1 })
+      body: JSON.stringify({ ...commun, version: versionAttendue + 1 }),
+      ...garder
     });
 
   if (r.statut === 'erreur') {
     // 409 : violation de clé primaire — la ligne existait déjà.
     if (r.code === 409) return { statut: 'conflit', distant: await relireApresRefus(config, session) };
-    return { statut: 'erreur', motif: r.motif };
+    return {
+      statut: 'erreur', motif: r.motif,
+      ...(r.code === undefined ? {} : { code: r.code }),
+      ...(r.panne === undefined ? {} : { panne: r.panne })
+    };
   }
 
   const lignes = Array.isArray(r.valeur) ? r.valeur : [];
