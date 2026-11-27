@@ -725,7 +725,9 @@ facture s'occupe des € ».
 * `Imprimer` et `Télécharger`, tous deux servis par **le nœud de l'aperçu**.
   Reconstruire le document une seconde fois pour le fichier aurait laissé les
   deux diverger, et l'utilisateur aurait envoyé au client un papier qu'il n'a
-  pas relu.
+  pas relu. *Le 27/11, `Télécharger` devient « Télécharger le PDF », comme le
+  pied du handoff : le PDF se dessine à part, mais d'après le MODÈLE que
+  l'aperçu affiche — voir la section du 27/11 en fin de document.*
 
 ### 11.3 Les trois écarts assumés, et leur motif
 
@@ -1655,3 +1657,23 @@ captures, 09:00 UTC) ; la carte dit « Cet appareil », pas « Ce téléphone »
 la largeur ne dit pas l'appareil, et l'écran l'appelle ainsi partout. Défaut
 trouvé à la relecture : à 390 px, l'heure se coupait en « 9 h » / « 41 » —
 espaces insécables, comme la maquette.
+
+## 27/11 — Activité › Compte rendu : « Télécharger le PDF »
+
+Demandé par le propriétaire. Référence : le pied du handoff (`pilote-cra`,
+`outils-cra`), `Envoyer · Imprimer · Télécharger le PDF` — l'envoi reste
+écarté (§11.3). Captures : `node scripts/capturer-app.mjs
+--ecran=activite-compte-rendu-atelier --port=4193`, démonstration et
+`--jeu=essai`, Calme à 1 440 px et Nuit à 390 px, relues le 27/11.
+
+| Endroit | Avant | Maintenant |
+|---|---|---|
+| Pied de l'atelier | `Imprimer` · `Télécharger` (principal), qui enregistrait un `.html` autonome | `Imprimer` · `Télécharger le PDF` (principal) : un `.pdf` A4, et le message « CRA_2026-06_Studio-Lumen.pdf téléchargé ». Au téléphone, le bouton passe sous la note, sans débordement |
+| L'aperçu | — | Inchangé : `innerHTML` identique octet pour octet. Au pixel, l'anticrénelage de quelques « j » bouge d'une fraction de pixel : le modèle rend « Semaine 1 » en un nœud de texte là où l'ancien JSX en faisait deux, et Chrome arrondit la largeur des colonnes à 1/64 px près. Les nœuds recoupés comme avant, la capture est identique au pixel |
+| Le PDF | — | Relu à côté de l'aperçu (démonstration, un client et tous clients ; jeu d'essai) : même contenu, même ordre, mêmes teintes et graisses. Écarts : Helvetica au lieu de la police système ; colonnes de lieu sur une grille fixe (59 % et 72 % de la largeur, l'aperçu les place selon le contenu, vers 57 % et 71 %) ; la flèche des plages vient de Symbol, plus appuyée ; les coupures de la note tombent ailleurs ; dans les totaux par client, les chiffres restent sur la grille des semaines là où l'aperçu les serre ; marges de page et « 1 / 2 » en pied |
+
+Défaut trouvé à la relecture et corrigé : dans les totaux par client, le PDF
+mettait les noms en retrait sous « Client » ; l'aperçu les place au bord
+gauche (ce tableau-là n'a pas d'intitulés, sa première colonne vide ne prend
+aucune place). Tenu par un test nommé, mutation tuée.
+

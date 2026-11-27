@@ -24,6 +24,10 @@ import styles from './Apercu.module.css';
  * `sortir` sérialise le nœud qu'on vient de montrer. Reconstruire le document
  * une seconde fois pour le fichier laisserait les deux diverger, et
  * l'utilisateur enverrait au client un papier qu'il n'a pas relu.
+ *
+ * Le PDF du compte rendu ne peut pas sérialiser un nœud HTML : il se dessine
+ * à part. Il lit donc le MODÈLE que ce nœud affiche (`modeleCra`), jamais les
+ * faits, et un test compare leurs textes ligne à ligne (`craPdf.test`).
  */
 export function Apercu({ children }: { readonly children: ReactNode }) {
   return (
@@ -43,15 +47,20 @@ export function Apercu({ children }: { readonly children: ReactNode }) {
  * `morceaux` compose le nom du fichier — « CRA », le mois, le client. Ils sont
  * nettoyés par `nomDeFichier` : un nom de client contenant une barre oblique
  * produirait sinon un chemin, et un fichier introuvable.
+ *
+ * `repli` nomme le bouton à proposer quand l'impression est refusée : le
+ * compte rendu ne télécharge plus que son PDF, et un message qui renverrait
+ * à un « Télécharger » absent de l'écran laisserait l'utilisateur chercher.
  */
 export function useSortieDocument(): (
   action: 'imprimer' | 'telecharger',
   titre: string,
-  morceaux: readonly string[]
+  morceaux: readonly string[],
+  repli?: string
 ) => void {
   const toast = useToast();
 
-  return (action, titre, morceaux) => {
+  return (action, titre, morceaux, repli = 'Télécharger') => {
     const papier = document.querySelector<HTMLElement>('[data-papier]');
     if (papier === null) return;
     const contenu = documentAutonome(titre, FEUILLE_DOCUMENT, papier.innerHTML);
@@ -63,7 +72,7 @@ export function useSortieDocument(): (
       return;
     }
     if (!imprimer(contenu)) {
-      toast('Impression refusée par le navigateur — utilise « Télécharger »');
+      toast(`Impression refusée par le navigateur — utilise « ${repli} »`);
     }
   };
 }

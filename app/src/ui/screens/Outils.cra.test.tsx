@@ -6,6 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { dateISO, euros } from '../../domain/types';
 import { type Faits, type Mission, faitsVides } from '../../state/schema';
 import { useFaits } from '../../state/store';
+import { relirePdf, titreDuPdf } from '../../test/lirePdf';
+import { FournisseurToasts } from '../components/Toasts';
 import { GenerateurCra } from './Outils.cra';
 
 afterEach(cleanup);
@@ -285,26 +287,66 @@ describe('la phrase de tâches', () => {
   });
 });
 
+/*
+ * LE CRA SORT EN PDF.
+ *
+ * Demandé par le propriétaire le 27/11 : le fichier HTML qu'on téléchargeait
+ * ne s'ouvrait proprement que dans un navigateur, et un client attend un PDF
+ * qu'il signe et archive. L'ancien test vérifiait ce fichier HTML ; il n'a
+ * plus d'objet, le bouton n'existe plus.
+ */
 describe('sortir le document', () => {
-  it('télécharge un fichier autonome, qui emporte sa feuille de style', async () => {
-    semer({ missions: [mission('Client Alpha', { lun: 1 })] });
+  /* Les deux méthodes seulement, jamais le constructeur : remplacer `URL`
+     entier cassait l'import différé du module PDF (« URL is not a
+     constructor »), et l'écran affichait son message d'échec. */
+  const origine = { creer: URL.createObjectURL, revoquer: URL.revokeObjectURL };
+  afterEach(() => {
+    URL.createObjectURL = origine.creer;
+    URL.revokeObjectURL = origine.revoquer;
+    vi.restoreAllMocks();
+  });
 
-    let ecrit = '';
-    const creerUrl = vi.fn((blob: Blob) => {
-      void blob.text().then((t) => { ecrit = t; });
-      return 'blob:x';
+  it('télécharge un PDF nommé par le mois et le client, qui porte ce que l’aperçu montre', async () => {
+    semer({
+      missions: [mission('Client Alpha', { lun: 1 }), mission('Client Beta', { jeu: 1 })],
+      notesCra: [
+        { semaine: dateISO('2026-06-01'), destinataire: 'Client Alpha', texte: 'Cadrage et recette' },
+        { semaine: dateISO('2026-06-01'), destinataire: 'Client Beta', texte: 'Note de Beta' }
+      ]
     });
-    vi.stubGlobal('URL', { ...URL, createObjectURL: creerUrl, revokeObjectURL: vi.fn() });
+    let fichier: Blob | null = null;
+    URL.createObjectURL = vi.fn((b: Blob | MediaSource) => { fichier = b as Blob; return 'blob:x'; });
+    URL.revokeObjectURL = vi.fn();
+    const noms: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      noms.push(this.download);
+    });
 
+    render(
+      <FournisseurToasts><GenerateurCra ouvert annee={2026} onFermer={() => {}} /></FournisseurToasts>
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Télécharger le PDF' }));
+    // Le module du PDF arrive au clic, et Vitest le transforme à ce
+    // moment-là : la seconde d'attente par défaut n'y suffit pas toujours.
+    expect(await screen.findByText('CRA_2026-06_Client-Alpha.pdf téléchargé', {}, { timeout: 4000 }))
+      .toBeTruthy();
+
+    expect(noms).toEqual(['CRA_2026-06_Client-Alpha.pdf']);
+    const pdf = fichier as Blob | null;
+    expect(pdf?.type).toBe('application/pdf');
+    const relu = relirePdf(new Uint8Array(await (pdf as Blob).arrayBuffer()));
+    expect(titreDuPdf(relu)).toBe('Compte-rendu d’activité — juin 2026 — Client Alpha');
+    const textes = relu.pages.flat().map((t) => t.texte);
+    // La note du client qui signe, jamais celle de l'autre : le PDF lit le
+    // modèle de l'aperçu, cloisonnement compris.
+    expect(textes).toContain('Tâches — Cadrage et recette');
+    expect(textes.join(' ')).not.toMatch(/Beta/);
+  });
+
+  it('n’offre plus de fichier HTML, et garde l’impression', () => {
+    semer({ missions: [mission('Client Alpha', { lun: 1 })] });
     rendre();
-    await userEvent.click(screen.getByRole('button', { name: 'Télécharger' }));
-    await new Promise((r) => { setTimeout(r, 0); });
-
-    expect(creerUrl).toHaveBeenCalled();
-    // Autonome : il s'ouvrira chez le client, sans notre application autour.
-    expect(ecrit).toMatch(/<!doctype html>/);
-    expect(ecrit).toMatch(/\.doc-table/);
-    expect(ecrit).toMatch(/Compte-rendu d’activité/);
-    vi.unstubAllGlobals();
+    expect(screen.queryByRole('button', { name: 'Télécharger' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Imprimer' })).toBeTruthy();
   });
 });

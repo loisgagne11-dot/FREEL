@@ -5,9 +5,12 @@ import { pourDestinataire, syntheseHebdomadaire } from '../../domain/calculs/cra
 import { destinatairesDuMois, journeesDuMois } from '../../state/selecteurs.cra';
 import { useFaits } from '../../state/store';
 import { noterSemaineCra } from '../../state/ecritures.activite';
-import { DocumentCra, enJours, plageDeSemaine } from '../documents/DocumentCra';
+import { DocumentCra } from '../documents/DocumentCra';
+import { enJours, modeleDuCra, plageDeSemaine } from '../documents/modeleCra';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
+import { nomDeFichier, telecharger } from '../../infra/telechargement';
 import { Sheet } from '../components/Sheet';
+import { useToast } from '../components/Toasts';
 import { moisLong } from '../format';
 import styles from './Outils.cra.module.css';
 
@@ -60,6 +63,7 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
   const faits = useFaits((e) => e.faits);
   const noter = noterSemaineCra;
   const sortie = useSortieDocument();
+  const toast = useToast();
 
   /*
    * Les mois de l'année qui portent des journées, et le mois courant.
@@ -146,10 +150,38 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
     return par;
   }, [faits.notesCra, cleNotes]);
 
+  const modele = useMemo(
+    () => modeleDuCra(synthese, faits.entreprise, destinataire, taches),
+    [synthese, faits.entreprise, destinataire, taches]
+  );
+
   const titreFichier = `CRA ${moisLong(m)}${destinataire === null ? '' : ` — ${destinataire}`}`;
 
-  const sortir = (action: 'imprimer' | 'telecharger'): void =>
-    sortie(action, titreFichier, ['CRA', mois, destinataire ?? 'tous-clients']);
+  const imprimer = (): void =>
+    sortie('imprimer', titreFichier, modele.morceauxDuNom, 'Télécharger le PDF');
+
+  /*
+   * LE PDF SE FABRIQUE AU CLIC, DEPUIS LE MODÈLE QUE L'APERÇU AFFICHE.
+   *
+   * L'écrivain et la mise en page arrivent à ce moment-là : on ouvre
+   * l'atelier pour relire, et la plupart des ouvertures ne téléchargent
+   * rien. Le fichier lit `modele`, le même objet que `DocumentCra` vient de
+   * rendre — pas une seconde lecture des faits qui pourrait diverger.
+   *
+   * Un module différé peut manquer (déploiement entre l'ouverture de la page
+   * et le clic, réseau coupé) : on le DIT, au lieu d'un bouton qui ne fait
+   * rien, et « Imprimer » reste là pour s'en passer.
+   */
+  async function telechargerPdf(): Promise<void> {
+    try {
+      const { pdfDuCra } = await import('../documents/craPdf');
+      const nom = `${nomDeFichier(...modele.morceauxDuNom)}.pdf`;
+      telecharger(nom, new Blob([pdfDuCra(modele, new Date())], { type: 'application/pdf' }));
+      toast(`${nom} téléchargé`);
+    } catch {
+      toast('Le PDF n’a pas pu être préparé — réessaie, ou passe par « Imprimer »');
+    }
+  }
 
   return (
     <Sheet
@@ -164,15 +196,18 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
             Synthèse <strong>par semaine</strong> reprise du planning · suivi
             d’activité, sans montants
           </span>
-          <button type="button" className={styles.bouton} onClick={() => sortir('imprimer')}>
+          <button type="button" className={styles.bouton} onClick={imprimer}>
             Imprimer
           </button>
+          {/* Le seul fichier : le HTML autonome qu'on téléchargeait ici ne
+              s'ouvrait proprement que dans un navigateur, et un client
+              attend un PDF qu'il signe et archive. */}
           <button
             type="button"
             className={`${styles.bouton} ${styles.principal}`}
-            onClick={() => sortir('telecharger')}
+            onClick={() => { void telechargerPdf(); }}
           >
-            Télécharger
+            Télécharger le PDF
           </button>
         </>
       )}
@@ -276,12 +311,7 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
         </div>
 
         <Apercu>
-          <DocumentCra
-            synthese={synthese}
-            entreprise={faits.entreprise}
-            destinataire={destinataire}
-            taches={taches}
-          />
+          <DocumentCra modele={modele} />
         </Apercu>
       </div>
     </Sheet>

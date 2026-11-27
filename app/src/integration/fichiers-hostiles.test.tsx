@@ -7,7 +7,8 @@
  * des clés qui visent le prototype, des nombres infinis ou démesurés, une
  * imbrication sans fond, cent mille lignes, des balises et des formules dans
  * chaque champ texte, une archive aux chemins piégés ou qui gonfle à
- * l'ouverture. Et ce qui sort — le livre CSV, le document HTML — est relu.
+ * l'ouverture. Et ce qui sort — le livre CSV, le document HTML, le PDF du
+ * compte rendu — est relu.
  *
  * Avant ce lot, rien ne prouvait la robustesse : aucune exécution n'avait été
  * constatée, mais rien ne l'aurait signalée si une modification en ouvrait une.
@@ -31,6 +32,11 @@ import {
   TAILLE_MAX_OCTETS, deposerJustificatif, empreinteDe, stockageMemoireJustificatifs
 } from '../infra/justificatifs';
 import { documentAutonome } from '../infra/telechargement';
+import { syntheseHebdomadaire } from '../domain/calculs/cra';
+import { mois } from '../domain/types';
+import { modeleDuCra } from '../ui/documents/modeleCra';
+import { pdfDuCra } from '../ui/documents/craPdf';
+import { relirePdf } from '../test/lirePdf';
 import { FournisseurToasts } from '../ui/components/Toasts';
 import { Releve } from '../ui/screens/Releve';
 import { Donnees } from '../ui/screens/Config.donnees';
@@ -349,7 +355,7 @@ describe('pièce déposée', () => {
 
 /* ── Ce qui sort ───────────────────────────────────────────────────────── */
 
-describe('ce qui sort : livre CSV, document HTML, calendrier .ics', () => {
+describe('ce qui sort : livre CSV, document HTML, calendrier .ics, PDF du compte rendu', () => {
   const ecriture = (modif: Partial<EcritureRecette>): EcritureRecette => ({
     id: 'r1', clientNom: 'Agence Démo', libelle: 'Conseil', montant: euros(100),
     emiseLe: dateISO('2026-03-01'), encaisseeLe: dateISO('2026-03-15'), modeReglement: 'virement',
@@ -406,5 +412,32 @@ describe('ce qui sort : livre CSV, document HTML, calendrier .ics', () => {
       expect(l).toMatch(/^(BEGIN|END|VERSION|PRODID|CALSCALE|UID|DTSTAMP|DTSTART;VALUE=DATE|DTEND;VALUE=DATE|SUMMARY|DESCRIPTION|TRANSP|ACTION|TRIGGER)[:;]/u);
     }
     expect(ics).not.toMatch(/Pirate|injecté/u);
+  });
+
+  /*
+   * Le PDF du compte rendu (27/11) : un nom de client, d'entreprise, une
+   * adresse ou une phrase de tâches — saisis, ou venus d'une sauvegarde
+   * fabriquée — qui tente de fermer sa chaîne et d'écrire des opérateurs. Le
+   * fichier doit se relire sans réparation, et chaque texte y rester du
+   * texte : un « /F1 99 Tf » échappé de sa chaîne poserait du corps 99.
+   */
+  it('garde au PDF du compte rendu sa forme, et y écrit chaque texte saisi comme du texte', () => {
+    const injection = 'Pirate) Tj ET BT /F1 99 Tf (injecté\\';
+    const hostiles = [...TEXTES_HOSTILES, injection];
+    const jours = hostiles.map((client, i) => ({
+      date: dateISO(`2026-06-0${String((i % 5) + 1)}`), client, quotite: 1 as const, lieu: null
+    }));
+    const modele = modeleDuCra(
+      syntheseHebdomadaire(mois('2026-06'), jours),
+      { ...faitsVides().entreprise, nom: injection, adresse: TEXTES_HOSTILES[0] },
+      null,
+      { '2026-06-01': `${injection}\r\n${TEXTES_HOSTILES[1]}` }
+    );
+    const relu = relirePdf(pdfDuCra(modele, new Date('2026-11-27T09:30:00Z')));
+    const textes = relu.pages.flat();
+
+    expect(textes.every((t) => t.taille < 20)).toBe(true);
+    const lu = textes.map((t) => t.texte).join('').replace(/\s+/g, '');
+    for (const t of hostiles) expect(lu).toContain(t.replace(/\s+/g, ''));
   });
 });
