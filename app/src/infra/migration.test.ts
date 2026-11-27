@@ -314,6 +314,21 @@ describe('conversion des données', () => {
     expect(f3?.emiseLe).toBe('2026-05-01');
   });
 
+  /*
+   * LE MOIS COUVERT SE REPREND (schéma 29). L'ancienne application faisait une
+   * facture par mois et le disait. Perdu, il ne resterait que la date
+   * d'émission : la facture de juin envoyée le 30 couvre bien juin, mais celle
+   * de juillet envoyée le 2 août couvrirait août, et juillet paraîtrait encore
+   * « à enregistrer ».
+   */
+  it('reprend le mois que chaque facture couvre, et la dit produite par FREEL', () => {
+    const r = migrer(avecLegacy());
+    if (r.statut !== 'migre') throw new Error('migration attendue');
+    const parNumero = (n: string) => r.faits.recettes.find((x) => x.numero === n);
+    expect(parNumero('2026-001')).toMatchObject({ moisFacture: '2026-06', emisePar: 'freel' });
+    expect(parNumero('2026-002')).toMatchObject({ moisFacture: '2026-07', emisePar: 'freel' });
+  });
+
   // « en_cours » et « perdue » existent dans le legacy. Tout rabattre sur
   // « active » faisait compter le prévisionnel d'une mission perdue.
   it('traduit les statuts de mission du legacy', () => {

@@ -19,7 +19,7 @@
     "invalide) — invariant n°6 : le dépôt est public, aucune donnée personnelle",
     "n'y entre."
   ],
-  "version": 28,
+  "version": 29,
   "entreprise": {
     "nom": "Atelier de démonstration",
     "prenom": "Camille",
@@ -47,7 +47,8 @@
     "regimeTva": "simplifie",
     "ca3Mensuelle": false,
     "nomExploitant": "",
-    "partGardeeRetiree": null
+    "partGardeeRetiree": null,
+    "emissionFactures": "freel"
   },
   "clients": [
     {
@@ -513,7 +514,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-002",
@@ -536,7 +539,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-003",
@@ -559,7 +564,9 @@
           "prixUnitaireHt": 480,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-004",
@@ -582,7 +589,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-005",
@@ -605,7 +614,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-006",
@@ -628,7 +639,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-021",
@@ -651,7 +664,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-022",
@@ -680,7 +695,9 @@
           "prixUnitaireHt": 480,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-023",
@@ -703,7 +720,9 @@
           "prixUnitaireHt": 520,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-024",
@@ -726,7 +745,9 @@
           "prixUnitaireHt": 400,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-025",
@@ -749,7 +770,9 @@
           "prixUnitaireHt": 480,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-026",
@@ -778,7 +801,9 @@
           "prixUnitaireHt": 110,
           "tauxTva": 0
         }
-      ]
+      ],
+      "emisePar": "freel",
+      "moisFacture": null
     },
     {
       "id": "rec-027",
@@ -794,7 +819,9 @@
       "relancesLe": [],
       "echeanceLe": null,
       "justificatifId": null,
-      "lignes": null
+      "lignes": null,
+      "emisePar": "freel",
+      "moisFacture": null
     }
   ],
   "depenses": [

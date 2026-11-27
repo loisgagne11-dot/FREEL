@@ -5,8 +5,12 @@ import { mentionsDuRegime } from '../../domain/calculs/facture';
 import { emetteurDe } from '../../state/selecteurs.facture';
 import { dateDuJour } from '../../state/selecteurs';
 import type { DateISO } from '../../domain/types';
+import type { ModeEmission } from '../../domain/calculs/emission';
 import { Champ } from '../components/Champ';
 import styles from './Config.module.css';
+import fiscal from './Config.fiscal.module.css';
+
+const MODES: readonly (readonly [ModeEmission, string])[] = [['freel', 'FREEL'], ['externe', 'Un autre logiciel']];
 
 /**
  * Où te faire payer.
@@ -24,14 +28,56 @@ export function Facturation() {
   const entreprise = faits.entreprise;
   const modifier = useFaits((e) => e.modifierEntreprise);
   const idChamp = useId();
+  const externe = entreprise.emissionFactures === 'externe';
 
   return (
     <div className={styles.carte}>
       <div className={styles.formulaire}>
+        {/* LE CHOIX D'ABORD (demandé le 22/11) : générer la facture, ou suivre
+            celle d'un autre logiciel. Celui qui émet dans Tiime n'avait que
+            deux mauvaises issues — émettre deux fois, sous deux numérotations
+            qui finissent par se croiser, ou ne rien saisir et perdre le livre
+            des recettes et les relances. Le même interrupteur que la
+            périodicité des cotisations : deux positions, une seule tabulation. */}
+        <div className={fiscal.periodicite}>
+          <div>
+            <p id={`${idChamp}-emission`} className={fiscal.periodiciteTitre}>
+              Tu émets tes factures avec
+            </p>
+            <p className={fiscal.aide}>
+              {externe
+                ? <>Tiime ou un autre&nbsp;: tu y émets, FREEL suit — numéro, dates, pièce
+                  jointe, encaissement. La numérotation et la conformité (mentions,
+                  facturation électronique) relèvent alors de ce logiciel.</>
+                : 'FREEL rédige, numérote et produit le document.'}
+            </p>
+          </div>
+          <div role="radiogroup" aria-labelledby={`${idChamp}-emission`} className={fiscal.interrupteur}>
+            {MODES.map(([valeur, libelle]) => (
+              <button key={valeur} type="button" role="radio"
+                aria-checked={entreprise.emissionFactures === valeur}
+                tabIndex={entreprise.emissionFactures === valeur ? 0 : -1}
+                className={fiscal.position}
+                onClick={() => modifier({ emissionFactures: valeur })}
+                onKeyDown={(e) => {
+                  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+                  e.preventDefault();
+                  modifier({ emissionFactures: valeur === 'freel' ? 'externe' : 'freel' });
+                  e.currentTarget.parentElement
+                    ?.querySelector<HTMLElement>('button:not([aria-checked="true"])')?.focus();
+                }}>
+                {libelle}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <Champ
           id={`${idChamp}-iban`}
           libelle="IBAN"
-          aide="Figure sur tes factures, pour que le client sache où virer. Rien n’est envoyé nulle part."
+          aide={externe
+            ? 'Ne sert qu’aux factures que FREEL produit : celles de ton logiciel portent l’IBAN que tu y as saisi.'
+            : 'Figure sur tes factures, pour que le client sache où virer. Rien n’est envoyé nulle part.'}
           controle={controlerIban(entreprise.iban)}
         >
           <input id={`${idChamp}-iban`} autoComplete="off" spellCheck={false}
@@ -92,26 +138,35 @@ export function Facturation() {
           mais elle doit se LIRE : « posées d'office » ne disait pas lesquelles.
           Un client assujetti dans un autre État de l'Union reçoit la mention
           d'autoliquidation à la place ; elle se voit sur sa facture. */}
-      <div className={styles.mentions}>
-        <p className={styles.mentionsTitre}>
-          Mentions portées sur chaque facture à un client en France
-        </p>
-        <ul>
-          {mentionsDuRegime(
-            emetteurDe(faits).enFranchise ? 'franchise' : 'tva_francaise',
-            dateDuJour(),
-            entreprise.optionTvaDebits
-          ).map((m) => <li key={m}>{m}</li>)}
-        </ul>
-      </div>
+      {/* Avec un autre logiciel, ces mentions et cette numérotation ne sont
+          plus celles de tes factures : les afficher laisserait croire que
+          FREEL les garantit sur un document qu'il ne produit pas. */}
+      {!externe && (
+        <div className={styles.mentions}>
+          <p className={styles.mentionsTitre}>
+            Mentions portées sur chaque facture à un client en France
+          </p>
+          <ul>
+            {mentionsDuRegime(
+              emetteurDe(faits).enFranchise ? 'franchise' : 'tva_francaise',
+              dateDuJour(),
+              entreprise.optionTvaDebits
+            ).map((m) => <li key={m}>{m}</li>)}
+          </ul>
+        </div>
+      )}
 
       {/* Le handoff montre aussi un préfixe, un délai et un logo. Rien de cela
           n'existe dans les faits : afficher des champs qui n'écrivent nulle
           part laisserait croire à un réglage. */}
       <p className={styles.explication}>
-        La numérotation des factures est automatique (année-numéro) et ces
-        mentions suivent ton régime de TVA&nbsp;: aucun réglage n’existe encore
-        pour les personnaliser.
+        {externe
+          ? <>Chaque facture émise dans ton logiciel s’enregistre dans Factures,
+            avec son numéro, ses dates et son PDF&nbsp;: FREEL ne lui attribue
+            aucun numéro.</>
+          : <>La numérotation des factures est automatique (année-numéro) et ces
+            mentions suivent ton régime de TVA&nbsp;: aucun réglage n’existe encore
+            pour les personnaliser.</>}
       </p>
     </div>
   );

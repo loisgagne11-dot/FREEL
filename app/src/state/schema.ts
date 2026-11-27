@@ -23,6 +23,7 @@ import type { Echeance } from '../domain/calculs/provisions';
 import type { FormuleDelai } from '../domain/calculs/delaiPaiement';
 import type { PieceAFournir } from '../domain/calculs/pieces';
 import type { PeriodeOptionVl } from '../domain/calculs/optionVl';
+import type { ModeEmission } from '../domain/calculs/emission';
 
 /**
  * La dépense est définie par le domaine, pas par le schéma.
@@ -74,8 +75,15 @@ export type { PieceAFournir };
  * garde une fois le pourcentage d'avant pour le dire. Une version antérieure
  * relirait un dossier sans part comme « 0 % » et le renverrait avec : un
  * réglage retiré reviendrait d'un autre appareil. Elle doit refuser le dossier.
+ *
+ * 29 (demandé le 22/11) : les factures émises dans un autre logiciel —
+ * `Entreprise.emissionFactures`, `Recette.emisePar`, `Recette.moisFacture`.
+ * Une version antérieure proposerait de « revoir » une facture de Tiime sous
+ * le document que FREEL reconstruirait, le numéro de Tiime en tête — un faux
+ * —, et effacerait au premier renvoi le mois que chaque facture couvre. Elle
+ * doit refuser le dossier.
  */
-export const VERSION_SCHEMA = 28 as const;
+export const VERSION_SCHEMA = 29 as const;
 export const CLE_STOCKAGE = 'freel.faits.v1' as const;
 /** Instantané pris avant la première écriture, pour pouvoir revenir en arrière. */
 export const CLE_INSTANTANE_AVANT_MIGRATION = 'freel.instantane.avant-migration.v1' as const;
@@ -199,6 +207,17 @@ export interface Entreprise {
    * verser » monterait de 10 % au premier chargement, sans un mot.
    */
   readonly partGardeeRetiree: number | null;
+  /**
+   * Avec quoi les factures s'émettent (schéma 29) : `freel`, qui rédige,
+   * numérote et produit le document ; `externe`, un autre logiciel — Tiime ou
+   * un autre —, dont FREEL enregistre les factures sans les produire.
+   *
+   * Défaut `freel` : c'est ce que faisait tout dossier d'avant. Le mode ne
+   * réécrit aucune facture passée — chacune garde sa provenance
+   * (`Recette.emisePar`) —, il dit seulement ce que l'écran propose : rédiger,
+   * ou enregistrer ce qui a été émis ailleurs.
+   */
+  readonly emissionFactures: ModeEmission;
 }
 
 export interface Client {
@@ -542,6 +561,26 @@ export interface Recette {
    * une liste vide — une facture a au moins une ligne.
    */
   readonly lignes?: readonly LigneConservee[] | null;
+  /**
+   * Le logiciel qui a produit le document (schéma 29). Absent vaut `freel` :
+   * c'est ce qu'était toute facture d'avant — voir `emiseParFreel`.
+   *
+   * Un fait de la facture, et non le mode du jour : une facture de Tiime reste
+   * une facture de Tiime le jour où l'on revient à FREEL. Rééditer la première
+   * produirait un document que le client n'a jamais reçu, sous un numéro qui
+   * n'est pas de FREEL.
+   */
+  readonly emisePar?: ModeEmission;
+  /**
+   * Le mois de prestation que la facture couvre (schéma 29), ou `null` quand
+   * on ne le sait pas — toute facture d'avant.
+   *
+   * La facture d'août s'émet souvent début septembre : lue à sa date
+   * d'émission, elle couvrirait septembre, et août resterait « à facturer »
+   * alors qu'il l'est. Faute de ce fait, la date d'émission reste le repli —
+   * voir `moisFactureDe`.
+   */
+  readonly moisFacture?: Mois | null;
 }
 
 /** Une ligne de facture conservée : ce que le document imprimait. */
@@ -798,7 +837,8 @@ export function entrepriseVide(): Entreprise {
     bic: '', adresse: '', codePostal: '', ville: '', codeApe: '', email: '',
     telephone: '', urssafPeriodicite: 'mensuel', onboardingFait: false,
     plateformeAgreee: null, optionTvaDebits: false,
-    regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: '', partGardeeRetiree: null
+    regimeTva: 'simplifie', ca3Mensuelle: false, nomExploitant: '', partGardeeRetiree: null,
+    emissionFactures: 'freel'
   };
 }
 

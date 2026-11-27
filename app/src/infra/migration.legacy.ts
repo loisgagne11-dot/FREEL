@@ -267,7 +267,14 @@ function extraireRecettes(missions: unknown[], anomalies: Anomalie[]): Recette[]
           ?? premierJourDuMois(texte(f['mois'])),
         encaisseeLe,
         modeReglement: modeReglement(f['modeReglement']),
-        numero: texte(f['numero'] ?? f['num'])
+        numero: texte(f['numero'] ?? f['num']),
+        // L'ancienne application produisait ses factures elle-même.
+        emisePar: 'freel',
+        // Elle faisait une facture par mois, et le disait (`mois`) : c'est le
+        // seul dossier où le mois couvert se reprend au lieu de se perdre. Lu
+        // à la date d'émission, le mois d'août facturé le 2 septembre
+        // paraîtrait encore à facturer (schéma 29).
+        moisFacture: /^\d{4}-(0[1-9]|1[0-2])$/u.test(texte(f['mois'])) ? texte(f['mois']) as Mois : null
       });
     });
   });
