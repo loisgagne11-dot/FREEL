@@ -1102,9 +1102,22 @@ stocké, tout se relit ou se dérive à l'ouverture.
 
 | Nombre ou état lu | Où | Avant | Après |
 |---|---|---|---|
-| Heure du dernier envoi | Carte « Sauvegardé » | « Compte enregistré le » + date courte | « Dernier envoi à **9 h 41** » (le jour même) ou « le 21/11 à 18 h 05 » : l'horloge de l'appareil qui a écrit (`maj_le`), indicative — elle n'arbitre jamais rien |
+| Heure du dernier envoi | Carte « Sauvegardé » | « Compte enregistré le » + date courte | « Dernier envoi à **9 h 41** » (le jour même) ou « le 21/11 à 18 h 05 » : l'horloge de l'appareil qui a écrit (`maj_le`), indicative — elle n'arbitre jamais rien. **Lot 42** : sur un appareil synchronisé, remplacée par l'heure de la dernière synchronisation (section suivante) |
 | État de la synchronisation | Pastille de la carte | — | « à jour », « à envoyer », « à recevoir », « diffère », « vide », « état inconnu », « illisible ici » — dérivé des faits des deux côtés (`selecteurs.synchro`, comparaison canonique : `jsonb` range les clés autrement). « À envoyer » et « à recevoir » seulement quand un côté est vide ; la démonstration ne compte pas comme des données |
 | Ce que contient l'appareil | Carte « Sauvegardé » | « Cet appareil : N recette(s), M dépense(s) » | Inchangé |
 | Lignes lisibles sans connexion | Santé du projet | Par table, dans le bloc « Règles d'accès » | Le total des tables exposées dans le constat (« 3 ligne(s) se lisent sans connexion »), et par table sous « Le détail, table par table » — compté par le serveur (`Content-Range`), jamais lu ; un total absent reste « non vérifié », jamais 0 |
 | Heure de la vérification | Santé ; étape 5 | « vérifié le 22/11/2026 10:00 » | « règles d'accès vérifiées à 9 h 40 » ; « vérifié à … — FREEL relit ce réglage » |
 | Projet joignable, clé acceptée, base, règles, inscriptions | Étape 3 ; santé | — | Un constat par maillon (✓, ✗ avec le geste, ? non vérifié, · en attente) ; lus sur des codes HTTP et des booléens (`disable_signup`), jamais sur un texte du serveur |
+
+## 22/11 — Lot 42 : la synchronisation automatique
+
+Avancé à la demande du propriétaire. Aucun graphe ; une heure, et des états,
+que la barre du haut montre sur tous les écrans.
+
+| Nombre ou état lu | Où | Avant | Après |
+|---|---|---|---|
+| Heure de la dernière synchronisation | Pastille de la barre du haut (bureau ; nom accessible au téléphone) ; carte « Sauvegardé » | Aucune : la pastille disait « Compte relié », faute d'heure conservée | « Synchronisé à 9 h 41 », « Synchronisé hier », « Synchronisé le 20/11 » ; « Dernière synchronisation à **9 h 41** ». L'horloge de CET appareil au moment où il s'est mis d'accord avec le compte (envoi accepté, compte adopté, égalité constatée) — retenue par l'appareil (`freel.synchro.appareil.v1`), jamais dans les faits ni sur le serveur ; affichée, elle n'arbitre rien (c'est le compteur de version qui tranche). La veille se dit « hier » : une heure seule se lirait « ce matin » |
+| Heure du dernier envoi | Carte « Sauvegardé » | « Dernier envoi à … » (`maj_le` du compte) | Remplacée, sur un appareil synchronisé, par l'heure ci-dessus : l'heure d'un autre appareil dit quand LUI a envoyé, pas quand celui-ci s'est mis d'accord. Un appareil jamais synchronisé la garde |
+| État de la synchronisation automatique | Pastille du haut ; pastille de la carte | « à jour / à envoyer / à recevoir / diffère » de la seule première liaison | Publié par le moteur (une source, `infra/synchro.etat`) : à jour, envoi…, hors ligne (avec ou sans changements à envoyer), à choisir, mise à jour en attente (formulaire ouvert), reconnecte-toi, mets FREEL à jour, à vérifier, démonstration, en échec. Ne s'invente pas : tant que le moteur n'a rien dit, la pastille donne l'heure de la dernière synchronisation, qui reste vraie |
+| Dates de « À choisir » | Carte « À choisir » | — | « Cet appareil a été modifié à … » : la dernière modification vue ici depuis la synchronisation (horloge de l'appareil) — ou « depuis la dernière synchronisation » si elle n'a pas été vue ; « le compte à … » : `maj_le` de l'état distant. Elles disent QUAND, pas qui a raison |
+| Contenu des deux côtés | Carte « À choisir » | — | « N recette(s), M dépense(s), K client(s) » ici et sur le compte, comptés sur les faits — ceux du compte après la validation du schéma |

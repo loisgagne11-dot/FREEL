@@ -5,6 +5,7 @@ import {
 } from '../../infra/supabase';
 import { oublierRetourDuLien, retourDuLien } from '../../infra/retourDuLien';
 import type { verifierProjet } from '../../infra/supabase.verification';
+import type { MoteurSynchro } from '../../infra/synchro.moteur';
 import type { EtapeGuide } from './Compte.guide';
 import { composantALaDemande } from '../composantALaDemande';
 import { SanteDuProjet } from './Compte.sante';
@@ -87,9 +88,11 @@ export interface ProprietesCompte {
   readonly ecran?: StockageLocal;
   /** La vérification du projet. Injectable pour les tests. */
   readonly verifier?: typeof verifierProjet;
+  /** Le moteur de la synchronisation automatique. Injectable pour les tests. */
+  readonly moteur?: MoteurSynchro;
 }
 
-export function Compte({ stockage, ecran, verifier }: ProprietesCompte = {}) {
+export function Compte({ stockage, ecran, verifier, moteur }: ProprietesCompte = {}) {
   const [local] = useState(() => stockage ?? stockageNavigateur());
   const [memoireEcran] = useState(() => ecran ?? stockageNavigateur('sessionStorage'));
   const projetFixe = configDeBuild() !== null;
@@ -222,6 +225,7 @@ export function Compte({ stockage, ecran, verifier }: ProprietesCompte = {}) {
         projetFixe={projetFixe}
         onDeconnecte={(texte) => { setSession(null); setMessage(texte); }}
         onChangerDeProjet={oublierProjet}
+        {...(moteur === undefined ? {} : { moteur })}
         sante={(pied, suite) => (
           <SanteDuProjet config={relie} pied={pied} suite={suite} {...(verifier === undefined ? {} : { verifier })} />
         )}

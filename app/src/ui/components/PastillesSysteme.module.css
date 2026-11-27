@@ -89,6 +89,15 @@
 
 .cloud:hover .etiquette { box-shadow: inset 0 0 0 1px var(--line-2); }
 
+/* Le libellé court d'un bureau étroit (lot 42) : à 800 px, « Hors ligne —
+   changements à envoyer » réduisait la recherche à sa loupe. */
+.libelleCourt { display: none; }
+
+@media (min-width: 761px) and (max-width: 1000px) {
+  .libelleLong { display: none; }
+  .libelleCourt { display: inline; }
+}
+
 /* L'icône ne sert qu'au téléphone. */
 .iconeCloud { display: none; }
 

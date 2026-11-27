@@ -78,14 +78,23 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('relié : la réponse d’abord', () => {
-  it('« Sauvegardé ● à jour » quand le compte porte ce qu’il y a ici, avec l’heure du dernier envoi', async () => {
+  /*
+   * Jusqu'au lot 42, la phrase disait l'heure du dernier ENVOI et renvoyait,
+   * pour l'autre appareil, à « Charger le compte sur cet appareil ». Ce n'est
+   * plus vrai : deux côtés identiques à la lecture sont une synchronisation,
+   * que l'appareil retient — il se synchronise ensuite tout seul. La phrase
+   * dit donc l'heure de la dernière SYNCHRONISATION, et que les autres
+   * appareils reçoivent d'eux-mêmes (maquette, état 5).
+   */
+  it('« Sauvegardé ● à jour » quand le compte porte ce qu’il y a ici, avec l’heure de la dernière synchronisation', async () => {
     reponses(ligne(JSON.parse(JSON.stringify(AVEC_DONNEES))));
     monter();
     const carte = (await screen.findByRole('heading', { name: /^Sauvegardé/ })).closest('section') as HTMLElement;
     expect(await within(carte).findByText('à jour')).toBeTruthy();
-    // L'heure du dernier envoi, en gras comme sur la maquette : la réponse à « est-ce parti ? ».
-    const heure = within(carte).getByText(/^(à|le \d\d\/\d\d à) \d{1,2} h \d\d$/, { selector: 'strong' });
-    expect(heure.closest('p')?.textContent).toMatch(/^Dernier envoi (à|le) .*\. Le compte porte exactement/);
+    // L'heure, en gras comme sur la maquette : la réponse à « est-ce parti ? ».
+    const heure = await within(carte).findByText(/^(à|hier à|le \d\d\/\d\d à) \d{1,2} h \d\d$/, { selector: 'strong' });
+    expect(heure.closest('p')?.textContent)
+      .toMatch(/^Dernière synchronisation (à|hier à|le) .*\. Tes autres appareils reçoivent ce qui change ici/);
     expect(within(carte).getByText('projet-demo.supabase.co')).toBeTruthy();
     expect(within(carte).getByText('demo@exemple.test')).toBeTruthy();
     expect(within(carte).getByRole('button', { name: 'Synchroniser maintenant' })).toBeTruthy();

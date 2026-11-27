@@ -361,6 +361,12 @@ export function Donnees(
                     ce qui est actuellement dans l’application, qui est mis de côté.
                     Les justificatifs déposés ne sont pas concernés&nbsp;: ils vivent
                     à part, et une sauvegarde JSON ne les contient pas.
+                    {/* Lot 42 : un appareil synchronisé envoie ce qui change ici.
+                        Le taire ferait croire la restauration locale seulement. */}
+                    {aRestaurer.origine === 'vide'
+                      ? ' Si cet appareil se synchronise avec un compte, FREEL te demandera avant de le vider aussi.'
+                      : ' Si cet appareil se synchronise avec un compte, la sauvegarde y part aussi ; ce qu’elle '
+                        + 'y remplace reste dans les états précédents du compte.'}
                   </p>
                 )}
                 {aRestaurer.origine === 'archive' && aRestaurer.archive !== undefined ? (

@@ -1,5 +1,9 @@
+import { useEffect } from 'react';
 import { useConfidentialite } from '../useConfidentialite';
-import { type StockageLocal, lireSession, sessionValide } from '../../infra/session';
+import { type Session, type StockageLocal, lireSession, sessionValide } from '../../infra/session';
+import { lireBase } from '../../infra/synchro.appareil';
+import type { EtatSynchroAppareil } from '../../infra/synchro.etat';
+import { quandSynchro, useEtatSynchro } from '../synchro.affichage';
 import styles from './PastillesSysteme.module.css';
 
 /**
@@ -57,14 +61,25 @@ export function PastillesSysteme() {
  * L'état du compte : la synchronisation, ÉCRITE au bureau.
  *
  * ─────────────────────────────────────────────────────────────────────────
- * TROIS ÉTATS, PAS DEUX
+ * ELLE DIT LA VÉRITÉ, OU ELLE SE TAIT (lot 42)
  * ─────────────────────────────────────────────────────────────────────────
  *
- * « Relié » et « hors ligne » ne suffisent pas : entre les deux se trouve la
- * session EXPIRÉE, qui est le cas dangereux. L'utilisateur croit être
+ * Synchronisé, elle donne l'HEURE de la dernière synchronisation réussie —
+ * « Synchronisé à 9 h 41 », « Synchronisé hier » : c'est le retard qu'on veut
+ * voir d'un coup d'œil. Puis ce qui se passe : « Envoi… », « Hors ligne —
+ * changements à envoyer », « À choisir », « Reconnecte-toi ». L'heure vient de
+ * ce que l'appareil retient de sa dernière synchronisation
+ * (`infra/synchro.appareil`) ; l'état, du moteur (`infra/synchro.etat`).
+ * Jusqu'au lot 42, aucune heure n'était conservée et la pastille ne disait
+ * que « relié » : écrire une heure aurait été l'inventer.
+ *
+ * Un appareil qui n'a JAMAIS synchronisé garde les trois états d'avant, et le
+ * cas qui les justifiait : la session EXPIRÉE. L'utilisateur croit être
  * synchronisé, saisit une semaine de travail, et rien n'est remonté. Un point
  * vert dans ce cas serait un mensonge, un point gris un contresens — c'est un
- * avertissement, et il porte la couleur des avertissements.
+ * avertissement, et il porte la couleur des avertissements. Synchronisé, une
+ * session expirée n'a rien d'alarmant : le moteur la renouvelle ; seul un
+ * REFUS du serveur fait dire « Reconnecte-toi ».
  *
  * ─────────────────────────────────────────────────────────────────────────
  * ÉCRITE À TOUTE LARGEUR DE BUREAU, ICÔNE AU TÉLÉPHONE (décision 2)
@@ -76,34 +91,46 @@ export function PastillesSysteme() {
  * « à traiter » : la place existe. Au téléphone, une icône dont le tracé change
  * avec l'état, et dont le nom accessible porte le détail.
  *
- * La maquette écrit « Synchronisé à 9 h 41 ». Aucune heure de dernière
- * synchronisation n'est conservée aujourd'hui : l'écrire serait l'inventer. La
- * pastille dit donc l'état du compte, qui est connu.
- *
  * ─────────────────────────────────────────────────────────────────────────
  * CE QU'ELLE NE FAIT PAS
  * ─────────────────────────────────────────────────────────────────────────
  *
- * Aucune requête. La pastille lit une clé de stockage et compare une date :
- * elle vit dans la barre du haut, présente sur tous les écrans, et une
- * pastille qui interroge le réseau à chaque montage coûterait plus cher que
- * ce qu'elle indique. Le rafraîchissement du jeton reste le travail de
- * l'écran Compte, qui le fait quand on s'y rend.
+ * Aucune requête. La pastille lit deux clés de stockage et l'état publié par
+ * le moteur : elle vit dans la barre du haut, présente sur tous les écrans, et
+ * une pastille qui interroge le réseau à chaque montage coûterait plus cher
+ * que ce qu'elle indique. Le réseau, c'est le moteur ; le jeton d'un appareil
+ * jamais synchronisé, l'écran Compte, quand on s'y rend.
  *
- * C'est un lien vers `#/reglages/compte` : dire qu'une session a expiré sans
- * offrir le chemin pour s'y reconnecter serait un reproche, pas un outil.
+ * C'est un lien vers `#/reglages/compte` : dire qu'il faut choisir, ou se
+ * reconnecter, sans offrir le chemin serait un reproche, pas un outil.
  */
 function PastilleCloud() {
-  const etat = etatDuCompte();
+  const synchro = useEtatSynchro();
+  const etat = etatDuCompte(synchro);
+  const relie = etat.session;
+  /*
+   * La synchronisation automatique démarre ici, et pas dans `main.tsx` : le
+   * paquet d'entrée est à 79,67 Ko sur 80, et cette barre est déjà différée.
+   * Elle arrive après le premier rendu, sur tous les écrans, et seulement si
+   * une session existe — qui n'a jamais relié de compte ne télécharge rien.
+   */
+  useEffect(() => {
+    if (!relie) return;
+    void import('../../infra/synchro.moteur').then((m) => m.demarrerSynchroAutomatique(), () => undefined);
+  }, [relie]);
   return (
-    <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/reglages/compte" title={etat.detail}>
+    <a className={`${styles.cloud} ${styles[etat.ton]}`} href="#/reglages/compte" title={etat.detail}
+      data-etat={synchro.phase}>
       <span className={styles.etiquette} data-role="libelle-synchro">
         <span className={styles.point} aria-hidden="true" />
-        <span>{etat.libelle}</span>
+        <span className={etat.libelleCourt === undefined ? undefined : styles.libelleLong}>{etat.libelle}</span>
+        {etat.libelleCourt !== undefined && (
+          <span className={styles.libelleCourt} aria-hidden="true">{etat.libelleCourt}</span>
+        )}
       </span>
       <svg className={styles.iconeCloud} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.2 4.4 4.4 0 0 0 7 18z" />
-        <path d={MARQUES[etat.ton]} />
+        <path d={MARQUES[etat.marque]} />
       </svg>
       {/* Le nom accessible porte le DÉTAIL, que le libellé visuel doit
           abréger pour tenir dans la barre — et qui est seul à parler au
@@ -113,39 +140,147 @@ function PastilleCloud() {
   );
 }
 
-/** Ce que l'icône porte dans son nuage : une coche, un point d'exclamation, un trait. */
-const MARQUES: Readonly<Record<EtatCompte['ton'], string>> = {
-  relie: 'M9.5 13.5l2 2 3.5-4',
-  expire: 'M12 10.5v3M12 16v.01',
-  local: 'M9.5 13.5h5'
+/**
+ * Ce que l'icône porte dans son nuage, au téléphone : une coche (synchronisé),
+ * une flèche (envoi), un point d'exclamation (il faut agir), une barre (hors
+ * ligne), un trait (rien de relié, ou rien qui bouge). La couleur suit le ton ;
+ * le tracé, lui, se lit sans elle.
+ */
+const MARQUES: Readonly<Record<EtatCompte['marque'], string>> = {
+  coche: 'M9.5 13.5l2 2 3.5-4',
+  fleche: 'M12 16v-5M9.8 13l2.2-2.2 2.2 2.2',
+  alerte: 'M12 10.5v3M12 16v.01',
+  barre: 'M9 11l6 5',
+  trait: 'M9.5 13.5h5'
 };
 
 type EtatCompte = {
   readonly ton: 'relie' | 'expire' | 'local';
+  readonly marque: 'coche' | 'fleche' | 'alerte' | 'barre' | 'trait';
   readonly libelle: string;
+  /**
+   * Le libellé d'un bureau étroit (761 à 1 000 px), quand le long ne tient
+   * pas : capturé à 800 px, « Hors ligne — changements à envoyer » écrasait la
+   * recherche à une loupe et une lettre. Le nom accessible garde le détail.
+   */
+  readonly libelleCourt?: string;
   readonly detail: string;
+  /** Une session existe : la synchronisation automatique a de quoi démarrer. */
+  readonly session: boolean;
 };
 
-function etatDuCompte(): EtatCompte {
+const VERS_COMPTE = 'Ouvrir Réglages › Compte & synchronisation';
+
+const MOTIFS_ANOMALIE: Readonly<Record<Extract<EtatSynchroAppareil, { phase: 'anomalie' }>['pourquoi'], string>> = {
+  'compte-efface': 'Le compte ne contient plus rien : il a sans doute été effacé depuis un autre appareil.',
+  'version-anterieure': 'Le compte est revenu à un état plus ancien que celui que cet appareil a vu.',
+  'compte-illisible': 'Le contenu du compte ne se lit pas ici.'
+};
+
+function etatDuCompte(synchro: EtatSynchroAppareil): EtatCompte {
   const local = stockageLocal();
   const session = local === null ? null : lireSession(local);
-  if (session === null) {
+  // AVANT l'absence de session : un refus du serveur l'efface
+  // (`reprendreSession`), et la pastille aurait dit « Non synchronisé » à
+  // quelqu'un dont les modifications attendent seulement qu'il se reconnecte.
+  if (synchro.phase === 'reconnecter') {
     return {
-      ton: 'local',
-      libelle: 'Non synchronisé',
-      detail: 'Tes données restent sur cet appareil. Ouvrir Réglages › Compte & synchronisation pour les '
-        + 'synchroniser.'
+      ton: 'expire', marque: 'alerte', session: session !== null, libelle: 'Reconnecte-toi',
+      detail: `La session${session === null ? '' : ` de ${session.email}`} a été refusée. Tes données restent `
+        + `sur cet appareil, rien n’est perdu : ${VERS_COMPTE} pour te reconnecter.`
     };
   }
+  if (session === null) {
+    return {
+      ton: 'local', marque: 'trait', session: false,
+      libelle: 'Non synchronisé',
+      detail: `Tes données restent sur cet appareil. ${VERS_COMPTE} pour les synchroniser.`
+    };
+  }
+  const base = local === null ? null : lireBase(local, session.utilisateurId);
+  if (base === null) return { ...avantLaPremiere(session), session: true };
+  const etat = (e: Omit<EtatCompte, 'session'>): EtatCompte => ({ ...e, session: true });
+  const derniere = quandSynchro(synchro.phase === 'a-jour' ? synchro.le : base.le);
+  const depuis = `Dernière synchronisation ${derniere.long}.`;
+  switch (synchro.phase) {
+    // `inactif` avec une base : le moteur n'a pas encore parlé. L'heure de la
+    // dernière synchronisation reste vraie en attendant.
+    case 'inactif':
+    case 'a-jour':
+      return etat({
+        ton: 'relie', marque: 'coche', libelle: `Synchronisé ${derniere.court}`,
+        detail: `Synchronisé ${derniere.long} — ${session.email}. Tes autres appareils le reçoivent à leur `
+          + 'prochaine ouverture, ou quand tu y reviens.'
+      });
+    case 'envoi':
+      return etat({
+        ton: 'relie', marque: 'fleche', libelle: 'Envoi…',
+        detail: `Envoi de tes dernières modifications vers le compte. ${depuis}`
+      });
+    case 'hors-ligne':
+      return synchro.aEnvoyer
+        ? etat({
+          ton: 'expire', marque: 'barre', libelle: 'Hors ligne — changements à envoyer',
+          libelleCourt: 'Hors ligne · à envoyer',
+          detail: 'Hors ligne. Tes modifications sont enregistrées sur cet appareil et partiront au retour '
+            + `du réseau. ${depuis}`
+        })
+        : etat({
+          ton: 'local', marque: 'barre', libelle: 'Hors ligne',
+          detail: `Hors ligne. ${depuis} FREEL regardera le compte au retour du réseau.`
+        });
+    case 'a-choisir':
+      return etat({
+        ton: 'expire', marque: 'alerte', libelle: 'À choisir',
+        detail: synchro.pourquoi === 'appareil-vide'
+          ? 'Cet appareil a été vidé, le compte porte encore tes données : FREEL ne le vide pas sans te le '
+            + `demander. ${VERS_COMPTE} pour choisir.`
+          : 'Cet appareil et le compte ont changé chacun de leur côté : FREEL ne mélange pas les deux. '
+            + `${VERS_COMPTE} pour choisir lequel garder.`
+      });
+    case 'attente-saisie':
+      return etat({
+        ton: 'local', marque: 'trait', libelle: 'Mise à jour en attente',
+        detail: 'Le compte a changé depuis un autre appareil. FREEL le prendra quand tu auras fermé le '
+          + 'formulaire en cours : rien ne change sous tes doigts.'
+      });
+    case 'mettre-a-jour':
+      return etat({
+        ton: 'expire', marque: 'alerte', libelle: 'Mets FREEL à jour',
+        detail: 'Le compte a été enregistré par une version plus récente de FREEL. Recharge la page pour '
+          + 'la mettre à jour : d’ici là, rien n’est envoyé ni reçu.'
+      });
+    case 'anomalie':
+      return etat({
+        ton: 'expire', marque: 'alerte', libelle: 'À vérifier',
+        detail: `${MOTIFS_ANOMALIE[synchro.pourquoi]} Rien n’est envoyé tout seul : ${VERS_COMPTE}.`
+      });
+    case 'demonstration':
+      return etat({
+        ton: 'local', marque: 'trait', libelle: 'Démonstration',
+        detail: `Cet appareil montre la démonstration : rien n’est envoyé ni reçu. ${VERS_COMPTE} pour `
+          + 'reprendre tes données.'
+      });
+    case 'erreur':
+      return etat({
+        ton: 'expire', marque: 'alerte', libelle: synchro.aEnvoyer ? 'Envoi en échec' : 'Synchro en échec',
+        detail: `Le serveur n’a pas accepté la synchronisation ; nouvel essai dans quelques minutes. ${depuis} `
+          + `${VERS_COMPTE} pour le détail.`
+      });
+  }
+}
+
+/** Relié, mais jamais synchronisé : les trois états d'avant le lot 42. */
+function avantLaPremiere(session: Session): Omit<EtatCompte, 'session'> {
   if (!sessionValide(session)) {
     return {
-      ton: 'expire',
+      ton: 'expire', marque: 'alerte',
       libelle: 'Session expirée',
       detail: `Session expirée pour ${session.email}. Tes saisies ne remontent plus : `
         + 'ouvrir Réglages › Compte & synchronisation pour se reconnecter.'
     };
   }
-  return { ton: 'relie', libelle: 'Compte relié', detail: `Compte relié — ${session.email}` };
+  return { ton: 'relie', marque: 'coche', libelle: 'Compte relié', detail: `Compte relié — ${session.email}` };
 }
 
 /** Le stockage local, ou `null` quand il est bloqué (navigation privée). */

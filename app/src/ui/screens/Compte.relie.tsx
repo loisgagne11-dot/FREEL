@@ -17,6 +17,12 @@ import { motifRefusExterieur } from '../../state/schema.exterieur';
  */
 import { completerFaits } from '../../state/schema.migrations';
 import { type EtatSynchro, etatDeSynchronisation } from '../../state/selecteurs.synchro';
+import { memesFaits, schemaDuCompte } from '../../state/synchro.regle';
+import { ecrireBase, lireBase, noterSynchronisation } from '../../infra/synchro.appareil';
+import { type EtatSynchroAppareil, publierEtatSynchro } from '../../infra/synchro.etat';
+import { type MoteurSynchro, moteurPour } from '../../infra/synchro.moteur';
+import { useEtatSynchro } from '../synchro.affichage';
+import { AChoisir, PhraseAutomatique } from './Compte.synchro';
 import type { RapportMigration } from '../../infra/migration';
 import { convertirBundle } from '../../infra/migration.legacy';
 import { estLeJeuDeDemonstration } from '../../domain/calculs/demonstration';
@@ -183,9 +189,9 @@ function resumeDistant(instantane: InstantaneDistant): Resume | null {
  */
 function motifRefusEnvoi(distant: InstantaneDistant | null): string | null {
   if (distant === null) return null;
-  const brut = distant.faits as { version?: unknown } | null;
-  const versionFaits = typeof brut?.version === 'number' ? brut.version : 0;
-  const schema = Math.max(distant.schema, versionFaits);
+  // La même lecture que la synchronisation automatique : deux calculs du
+  // schéma d'un compte finiraient par ne pas dire la même chose.
+  const schema = schemaDuCompte(distant);
   if (schema <= VERSION_SCHEMA) return null;
   return `Le compte a été enregistré par une version plus récente de l’application `
     + `(schéma ${schema}, connu ici : ${VERSION_SCHEMA}). L’envoyer depuis cet appareil `
@@ -202,6 +208,39 @@ const ENTETES: Readonly<Record<EtatSynchro, { titre: string; pastille: string; t
   differe: { titre: 'Pas à jour', pastille: 'diffère', ton: 'attente' },
   inconnu: { titre: 'Compte relié', pastille: 'état inconnu', ton: 'attente' },
   illisible: { titre: 'Compte relié', pastille: 'illisible ici', ton: 'attente' }
+};
+
+/**
+ * La pastille et le titre de la carte quand l'appareil se synchronise tout
+ * seul (lot 42) : « Sauvegardé », et ce qui se passe — à jour, envoi…, à
+ * choisir, hors ligne. Les états où le compte n'est plus celui qu'on croit
+ * gardent le titre neutre : « Sauvegardé » y serait une promesse fausse.
+ */
+const ENTETES_AUTO: Readonly<Record<EtatSynchroAppareil['phase'], { titre: string; pastille: string; ton: TonStatut }>> = {
+  inactif: { titre: 'Sauvegardé', pastille: 'à jour', ton: 'ok' },
+  'a-jour': { titre: 'Sauvegardé', pastille: 'à jour', ton: 'ok' },
+  envoi: { titre: 'Sauvegardé', pastille: 'envoi…', ton: 'attente' },
+  'attente-saisie': { titre: 'Sauvegardé', pastille: 'mise à jour en attente', ton: 'attente' },
+  'hors-ligne': { titre: 'Sauvegardé', pastille: 'hors ligne', ton: 'attente' },
+  'a-choisir': { titre: 'Sauvegardé', pastille: 'à choisir', ton: 'attente' },
+  erreur: { titre: 'Sauvegardé', pastille: 'en échec', ton: 'attente' },
+  reconnecter: { titre: 'Compte relié', pastille: 'session refusée', ton: 'attente' },
+  'mettre-a-jour': { titre: 'Compte relié', pastille: 'version plus récente', ton: 'attente' },
+  anomalie: { titre: 'Compte relié', pastille: 'à vérifier', ton: 'attente' },
+  demonstration: { titre: 'Compte relié', pastille: 'démonstration', ton: 'neutre' }
+};
+
+/**
+ * Ce que dit « Synchroniser maintenant » d'un appareil synchronisé, une fois
+ * le moteur passé. « À choisir » n'a pas de phrase : la carte qui fait choisir
+ * s'affiche, et c'est elle qui parle.
+ */
+const APRES_SYNCHRO: Partial<Record<EtatSynchroAppareil['phase'], string>> = {
+  'a-jour': 'À jour : le compte porte ce qu’il y a sur cet appareil.',
+  'hors-ligne': 'Hors ligne : rien n’a pu partir. Tes modifications restent sur cet appareil.',
+  'attente-saisie': 'Le compte a changé : FREEL le prendra quand le formulaire ouvert sera fermé.',
+  demonstration: 'Cet appareil montre la démonstration : rien n’est envoyé ni reçu. « Charger le compte '
+    + 'sur cet appareil » reprend tes données.'
 };
 
 /** Ce que « Synchroniser maintenant » fait quand il ne peut pas choisir le sens. */
@@ -223,15 +262,28 @@ export interface ProprietesRelie {
   readonly onChangerDeProjet: () => void;
   /** La santé du projet, avec les gestes de son pied et ce qu'ils ouvrent. */
   readonly sante: (pied: ReactNode, suite: ReactNode) => ReactNode;
+  /** Le moteur de la synchronisation automatique. Injectable pour les tests. */
+  readonly moteur?: MoteurSynchro;
 }
 
 export function Relie(
-  { config, session, local, projetFixe, onDeconnecte, onChangerDeProjet, sante }: ProprietesRelie
+  { config, session, local, projetFixe, onDeconnecte, onChangerDeProjet, sante, moteur }: ProprietesRelie
 ) {
   const remplacerParBundle = useFaits((e) => e.remplacerParBundle);
   const adopterFaitsDistants = useFaits((e) => e.adopterFaitsDistants);
   const faitsLocaux = useFaits((e) => e.faits);
   const id = useId();
+  /*
+   * L'appareil se synchronise-t-il tout seul ? Oui dès qu'il a une BASE pour
+   * ce compte : une première synchronisation réussie, faite ici. Avant, la
+   * première liaison reste ce parcours, avec ses confirmations (lot 42).
+   * Relue à chaque rendu — le moteur la réécrit en arrière-plan, et l'état
+   * qu'il publie fait rendre l'écran.
+   */
+  const etatAuto = useEtatSynchro();
+  const base = lireBase(local, session.utilisateurId);
+  const auto = base !== null;
+  const leMoteur = (): MoteurSynchro => moteur ?? moteurPour(local);
 
   const [etat, setEtat] = useState<Etat>({ phase: 'connecte' });
   const [distant, setDistant] = useState<EtatDistant>('inconnu');
@@ -266,7 +318,23 @@ export function Relie(
       return 'inconnu';
     }
     setDistant(r.valeur);
+    // Les deux côtés portent la même chose : c'est une synchronisation, et
+    // l'appareil la retient. C'est par là qu'un appareil déjà relié AVANT le
+    // lot 42 entre dans la synchronisation automatique, sans rien envoyer ni
+    // recevoir — il suffit d'ouvrir cet écran une fois.
+    if (r.valeur !== null && memesFaits(faitsLocaux, r.valeur)) retenir(r.valeur.version, faitsLocaux);
     return r.valeur;
+  }
+
+  /**
+   * Retient une synchronisation réussie ici — envoi, chargement, égalité
+   * constatée, retour à un état précédent — et réveille le moteur : la suite
+   * se fera toute seule.
+   */
+  function retenir(version: number, faits: unknown): void {
+    const nouvelle = noterSynchronisation(local, session.utilisateurId, version, faits);
+    publierEtatSynchro({ phase: 'a-jour', le: nouvelle.le });
+    leMoteur().demarrer();
   }
 
   // Le compte se lit à l'ouverture, une fois : le mode strict rejoue les
@@ -275,9 +343,29 @@ export function Relie(
     if (premiereLecture.current) return;
     premiereLecture.current = true;
     void relireEtatDistant();
+    // Synchronisé : ce que l'écran affiche vient du moteur, et doit être
+    // frais à l'ouverture — un « Reconnecte-toi » d'avant la reconnexion, ou
+    // un « hors ligne » d'avant le retour du réseau, y mentirait.
+    if (auto) void leMoteur().synchroniser('manuel');
     // `relireEtatDistant` ne dépend que de la session, fixe pour cet écran.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /*
+   * Le moteur a synchronisé en arrière-plan pendant que l'écran est ouvert :
+   * ce que l'écran a lu du compte n'est plus à jour, et « Enregistrer cet
+   * appareil » partirait sur une version dépassée — refusée par le serveur,
+   * mais après un conflit qu'on aurait pu éviter. On relit.
+   */
+  const versionBase = base?.version;
+  useEffect(() => {
+    if (versionBase === undefined || !lu || distant === 'inconnu') return;
+    if (distant !== null && distant.version === versionBase) return;
+    void relireEtatDistant();
+    // Seul le changement de la base déclenche la relecture : relire à chaque
+    // nouvel état distant relirait en boucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versionBase]);
 
   /* ── Synchroniser ────────────────────────────────────────────────────── */
 
@@ -286,11 +374,23 @@ export function Relie(
    * quand le compte n'a rien, montrer ce qu'il apporte quand c'est cet appareil
    * qui n'a rien. Quand les deux ont des données différentes, rien ne dit
    * lequel est le plus récent — l'écran le dit, et laisse choisir.
+   *
+   * Un appareil qui se synchronise déjà tout seul passe par le moteur : la
+   * même règle que l'automatique, maintenant — pas une seconde règle qui
+   * finirait par ne pas dire la même chose.
    */
   async function synchroniser(): Promise<void> {
     setEnCours(true);
     setErreur(null);
     setMessage(null);
+    if (auto) {
+      const resultat = await leMoteur().synchroniser('manuel');
+      await relireEtatDistant();
+      setEnCours(false);
+      const texte = APRES_SYNCHRO[resultat.phase];
+      if (texte !== undefined) setMessage(texte);
+      return;
+    }
     const relu = await relireEtatDistant();
     setEnCours(false);
     const sens = etatDeSynchronisation(faitsLocaux, relu);
@@ -347,6 +447,7 @@ export function Relie(
       return;
     }
     setDistant(r.instantane);
+    retenir(r.instantane.version, faitsLocaux);
     setEtat({ phase: 'connecte' });
     setMessage('Données de cet appareil enregistrées sur le compte.');
   }
@@ -377,9 +478,12 @@ export function Relie(
     montrerApercu(instantane);
   }
 
-  async function confirmerRecuperation(faits: Faits): Promise<void> {
+  async function confirmerRecuperation(instantane: InstantaneDistant, faits: Faits): Promise<void> {
     const motif = await adopterFaitsDistants(faits);
     if (motif !== null) { setErreur(motif); return; }
+    // L'empreinte de ce que le MAGASIN a posé, pas du bloc reçu : c'est lui
+    // qu'on comparera ensuite pour dire « modifié ici ».
+    retenir(instantane.version, useFaits.getState().faits);
     setEtat({ phase: 'connecte' });
     setMessage('Données du compte chargées. Elles remplacent l’état de cet appareil.');
   }
@@ -421,7 +525,16 @@ export function Relie(
     const r: ResultatEffacement = quoi === 'faits'
       ? await effacerFaitsDuCompte(config, session)
       : await effacerDonneesLegacy(config, session);
-    if (quoi === 'faits') await relireEtatDistant();
+    if (quoi === 'faits') {
+      // Le compte n'a plus rien : la base ne désigne plus rien. Gardée, elle
+      // ferait dire « effacé ailleurs » à cet appareil même. Les AUTRES, eux,
+      // le diront — et ne renverront rien tout seuls.
+      if (r.statut === 'efface' || r.statut === 'deja-vide') {
+        ecrireBase(local, null);
+        publierEtatSynchro({ phase: 'inactif' });
+      }
+      await relireEtatDistant();
+    }
     setEnCours(false);
     const copie = quoi === 'faits' ? 'de cette version' : 'de l’ancienne application';
     switch (r.statut) {
@@ -466,7 +579,7 @@ export function Relie(
 
   /* ── Rendu ───────────────────────────────────────────────────────────── */
 
-  const entete = ENTETES[lu ? synchro : 'inconnu'];
+  const entete = auto ? ENTETES_AUTO[etatAuto.phase] : ENTETES[lu ? synchro : 'inconnu'];
   const ici = resumer(faitsLocaux);
   const refus = distant === 'inconnu' ? null : motifRefusEnvoi(distant);
   const libre = etat.phase === 'connecte';
@@ -506,11 +619,36 @@ export function Relie(
         if (i !== null) setDistant(i);
         else void relireEtatDistant();
       }}
+      onRevenu={(i) => retenir(i.version, useFaits.getState().faits)}
     />
   );
 
   return (
     <div className={styles.pile}>
+      {/* « À choisir » d'abord : la pastille du haut y mène, et c'est la
+          seule chose de l'écran qui attend une décision. */}
+      {auto && etatAuto.phase === 'a-choisir' && (
+        <AChoisir
+          etat={etatAuto}
+          ici={faitsLocaux}
+          desactive={enCours}
+          onTrancher={async (choix) => {
+            setEnCours(true);
+            setErreur(null);
+            setMessage(null);
+            const apres = await leMoteur().trancher(choix, etatAuto.distant.version);
+            await relireEtatDistant();
+            setEnCours(false);
+            if (apres.phase === 'a-jour') {
+              setMessage(choix === 'garder-ici'
+                ? 'Gardé : le compte porte maintenant ce qu’il y a sur cet appareil. L’état écarté est dans '
+                  + 'les états précédents du compte.'
+                : 'Pris : cet appareil porte maintenant ce qu’il y a sur le compte. L’état écarté est mis de '
+                  + 'côté dans Données, « Revenir à l’état d’avant ».');
+            }
+          }}
+        />
+      )}
       <section className={styles.carte} aria-labelledby={`${id}-titre`}>
         <div className={styles.enTete}>
           <h3 id={`${id}-titre`} className={styles.titreCarte}>
@@ -523,10 +661,12 @@ export function Relie(
               lecture seule.
             </Info>
           </h3>
-          {lu && <Statut libelle={entete.pastille} ton={entete.ton} />}
+          {(lu || auto) && <Statut libelle={entete.pastille} ton={entete.ton} />}
         </div>
 
-        <PhraseDuCompte synchro={lu ? synchro : null} distant={distant} refus={refus} />
+        {auto
+          ? <PhraseAutomatique etat={etatAuto} base={base} />
+          : <PhraseDuCompte synchro={lu ? synchro : null} distant={distant} refus={refus} />}
 
         <dl className={styles.detail}>
           <div className={styles.ligne}><dt>Projet</dt><dd className={styles.mono}>{new URL(config.url).host}</dd></div>
@@ -590,7 +730,7 @@ export function Relie(
           <ApercuDistant
             resume={resumer(etat.faits)}
             majLe={etat.instantane.majLe}
-            onConfirmer={() => void confirmerRecuperation(etat.faits)}
+            onConfirmer={() => void confirmerRecuperation(etat.instantane, etat.faits)}
             onAnnuler={() => setEtat({ phase: 'connecte' })}
           />
         )}
@@ -734,9 +874,11 @@ export function Relie(
 }
 
 /**
- * La phrase sous le titre : l'heure du dernier envoi, et ce que l'état veut
- * dire pour la suite. Rien n'est promis que l'application ne fasse : un autre
- * appareil ne reçoit rien tout seul, il charge le compte.
+ * La phrase sous le titre, pour un appareil qui n'a pas encore synchronisé :
+ * l'heure du dernier envoi, et ce que l'état veut dire pour la suite. Rien
+ * n'est promis que l'application ne fasse : tant que cet appareil n'a pas
+ * synchronisé une première fois, rien ne part ni n'arrive tout seul. Ensuite,
+ * c'est `PhraseAutomatique` qui parle.
  */
 function PhraseDuCompte(
   { synchro, distant, refus }: { synchro: EtatSynchro | null; distant: EtatDistant; refus: string | null }

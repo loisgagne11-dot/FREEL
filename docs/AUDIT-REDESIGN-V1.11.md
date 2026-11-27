@@ -1620,7 +1620,7 @@ Relues contre la maquette le 22/11.
 | 3. Relier FREEL | Carte « 3. Relier FREEL », aides sous les champs, « Vérifier » pleine largeur, constats ✓ / ✗ / · | Ajouté : « ‹ Revoir l'étape 2 » sous une base absente, « Continuer » quand tout tient ; un constat « non vérifié » (?, ambre) quand une table n'a pas pu être comptée |
 | 4. Ton compte | Onglets « Me connecter » / « Créer mon compte », « Mot de passe oublié ? », la phrase des deux comptes | Onglets soulignés (composant `Onglets` de l'application) au lieu du segment en pilule ; ajouté sous « Créer mon compte » et « Mot de passe oublié ? » : l'adresse de retour à déclarer dans le projet, copiable |
 | 4. Fermer les inscriptions | Carte « 5. Fermer les inscriptions », constat relu, « vérifié à … — FREEL relit ce réglage », « Vérifier à nouveau » | Ajouté : « Terminer » quand elles sont fermées, « Plus tard » sinon |
-| 5. Sauvegardé ● à jour | Titre et pastille, « Dernier envoi à **9 h 41** », Projet, Connecté, « Synchroniser maintenant », « Me déconnecter » | « Tes autres appareils le reçoivent à leur prochaine ouverture » n'est pas écrit : c'est faux, la synchronisation est manuelle — remplacé par « Sur un autre appareil, « Charger le compte sur cet appareil » le récupère ». Ajoutés pour ne perdre aucun geste : « Cet appareil » (recettes, dépenses), « Dans un sens précis » (les deux transferts, chacun avec sa conséquence) |
+| 5. Sauvegardé ● à jour | Titre et pastille, « Dernier envoi à **9 h 41** », Projet, Connecté, « Synchroniser maintenant », « Me déconnecter » | « Tes autres appareils le reçoivent à leur prochaine ouverture » n'est pas écrit : c'est faux, la synchronisation est manuelle — remplacé par « Sur un autre appareil, « Charger le compte sur cet appareil » le récupère ». **Devenu vrai au lot 42 (22/11)** : la phrase est écrite, sur un appareil synchronisé — voir « Lot 42 » plus bas. Ajoutés pour ne perdre aucun geste : « Cet appareil » (recettes, dépenses), « Dans un sens précis » (les deux transferts, chacun avec sa conséquence) |
 | 5. Santé du projet | Base préparée, Un inconnu ne lit rien (heure), Inscriptions fermées, Offre gratuite ; « Changer de projet », « États précédents » | Ajoutés : « Vérifier à nouveau » et « Le détail, table par table » (le verdict par table de l'ancien bloc « Règles d'accès ») ; le projet et la clé ne s'y montrent que lorsqu'ils cassent |
 | 5. « les gestes rares descendent en pied de carte » | Carte « Plus rarement » : reprise de l'ancienne version, effacer l'appareil, effacer du compte | Une carte à part plutôt que le pied de la santé : quatre gestes et leurs conséquences l'auraient noyée |
 | Boutons en pilule de 46 px | Boutons de l'écran (44 px, rayon `--r-sm`) ; un seul vert plein par vue | Styles de l'écran conservés, comme demandé ; la police est celle du système (décision 6) |
@@ -1631,3 +1631,27 @@ triangle du navigateur. Un chevron, qui tourne à l'ouverture (test nommé,
 mutation tuée). Le même défaut existe ailleurs dans l'application : liste de
 sortie, « Hors lot ». À 390 px, la barre basse fixe recouvre une bande de la
 capture en pleine page : artefact connu de toutes les captures au téléphone.
+
+## Lot 42 (22/11) — la pastille du haut et Réglages › Compte, synchronisés
+
+Avancé le 22/11 à la demande du propriétaire. Références : `navigation.html`
+(« Synchronisé à 9 h 41 », écrit au bureau, icône nommée au téléphone) et
+`compte.html`, état 5. Captures : `node scripts/capturer-app.mjs
+--ecran=synchro` (et `--largeur=390`), cinq états produits par le VRAI moteur
+face au projet factice — `synchro-a-jour`, `-envoi`, `-hors-ligne`,
+`-a-choisir`, `-reconnecte-toi` — ; `--ecran=reglages-compte` pour
+`-relie`, `-a-choisir` et `-a-choisir-garder`. Relues le 22/11 en Calme, à
+1 440, 1 024, 800 et 390 px.
+
+| Endroit | Avant | Maintenant |
+|---|---|---|
+| Pastille de la barre, bureau | « Compte relié », « Session expirée », « Non synchronisé » | Synchronisé : « Synchronisé à 11 h 00 » (comme la maquette, l'heure de la dernière synchronisation), « Envoi… », « Hors ligne — changements à envoyer » (« Hors ligne · à envoyer » de 761 à 1 000 px : à 800, le long écrasait la recherche à sa loupe), « À choisir », « Reconnecte-toi », « Mets FREEL à jour », « À vérifier », « Démonstration », « Mise à jour en attente ». Jamais synchronisé : les trois états d'avant |
+| Pastille, téléphone | Coche, point d'exclamation, trait | Coche (synchronisé), flèche (envoi), barre (hors ligne), point d'exclamation (il faut agir), trait ; la couleur suit le ton, le nom accessible dit tout |
+| Réglages › Compte, « Sauvegardé » | « Dernier envoi à … » et « Charger le compte sur cet appareil le récupère » | « Dernière synchronisation à **11 h 00**. Tes autres appareils reçoivent ce qui change ici à leur prochaine ouverture, ou quand tu y reviens. » — la phrase de la maquette, vraie désormais ; pastille « à jour / envoi… / à choisir / hors ligne / en échec » |
+| « À choisir » | — | Carte en tête : « Cet appareil a été modifié à …, le compte à … depuis un autre appareil. FREEL ne mélange pas les deux : choisis lequel garder. », les deux contenus côte à côte, deux boutons de même poids (FREEL ne choisit pas) ; puis la conséquence, « Télécharger la version que tu écartes », la confirmation en vert, « Revenir » |
+
+Écarts : l'heure des captures est 11 h 00 et non 9 h 41 (horloge figée des
+captures, 09:00 UTC) ; la carte dit « Cet appareil », pas « Ce téléphone » —
+la largeur ne dit pas l'appareil, et l'écran l'appelle ainsi partout. Défaut
+trouvé à la relecture : à 390 px, l'heure se coupait en « 9 h » / « 41 » —
+espaces insécables, comme la maquette.

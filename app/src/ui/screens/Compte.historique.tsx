@@ -29,6 +29,12 @@ export interface ProprietesEtatsPrecedents {
   /** Le compte a changé, ou n'est plus celui qu'on croyait : le parent le reprend (`null` = à relire). */
   readonly onCompteModifie: (instantane: InstantaneDistant | null) => void;
   /**
+   * Le compte ET cet appareil sont revenus à l'état choisi : une
+   * synchronisation, que le parent retient (lot 42). Sans elle, l'appareil
+   * croirait son dossier « modifié », et le renverrait par-dessus.
+   */
+  readonly onRevenu?: (instantane: InstantaneDistant) => void;
+  /**
    * Lire la liste dès l'affichage. Vrai quand on l'ouvre par « États
    * précédents », en pied de la santé du projet : le clic a déjà dit qu'on la
    * voulait, un second bouton « Voir » ne ferait que le redemander.
@@ -50,7 +56,7 @@ const quand = (iso: string): string => {
 };
 
 export function EtatsPrecedents(
-  { config, session, distant, desactive, onCompteModifie, lireDesLOuverture = false }: ProprietesEtatsPrecedents
+  { config, session, distant, desactive, onCompteModifie, onRevenu, lireDesLOuverture = false }: ProprietesEtatsPrecedents
 ) {
   const adopterFaitsDistants = useFaits((e) => e.adopterFaitsDistants);
   const [liste, setListe] = useState<Liste>(() => (lireDesLOuverture ? { phase: 'chargement' } : { phase: 'repos' }));
@@ -116,6 +122,7 @@ export function EtatsPrecedents(
     }
     onCompteModifie(r.instantane);
     const refus = await adopterFaitsDistants(faits);
+    if (refus === null) onRevenu?.(r.instantane);
     setEnCours(false);
     void charger();
     setBilan(refus === null

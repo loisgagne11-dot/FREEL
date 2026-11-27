@@ -35,10 +35,13 @@ const ecritures = (appel: ReturnType<typeof vi.fn>) =>
     .filter(([, o]) => (o?.method ?? 'GET') !== 'GET')
     .map(([url, o]) => ({ url, methode: o?.method, corps: JSON.parse(String(o?.body ?? 'null')) as unknown }));
 
+const onRevenu = vi.fn();
+
 function monter(distant: InstantaneDistant | null | 'inconnu' = DISTANT) {
   const onCompteModifie = vi.fn();
+  onRevenu.mockClear();
   render(<EtatsPrecedents config={CONFIG} session={SESSION} distant={distant}
-    desactive={false} onCompteModifie={onCompteModifie} />);
+    desactive={false} onCompteModifie={onCompteModifie} onRevenu={onRevenu} />);
   return onCompteModifie;
 }
 
@@ -101,6 +104,10 @@ describe('états précédents du compte', () => {
     expect(ecrite?.corps).toMatchObject({ version: 10, faits: { soldeInitial: 1234 } });
     expect(onCompteModifie).toHaveBeenCalledWith(expect.objectContaining({ version: 10 }));
     expect(useFaits.getState().faits.soldeInitial).toBe(1234);
+    // Lot 42 : le compte ET l'appareil sont revenus au même état — une
+    // synchronisation, que le parent retient. Sans elle, l'appareil se
+    // croirait modifié et renverrait par-dessus l'état qu'on vient de choisir.
+    expect(onRevenu).toHaveBeenCalledWith(expect.objectContaining({ version: 10 }));
   });
 
   it('un compte qui a bougé entre-temps refuse, et cet appareil ne change pas', async () => {
@@ -119,6 +126,7 @@ describe('états précédents du compte', () => {
     expect((await screen.findByRole('alert')).textContent).toMatch(/Le compte a changé entre-temps.*Rien n’a été modifié/s);
     expect(useFaits.getState().faits.soldeInitial).not.toBe(1234);
     expect(onCompteModifie).toHaveBeenCalledWith(expect.objectContaining({ version: 11 }));
+    expect(onRevenu).not.toHaveBeenCalled();
   });
 
   /** Le charger effacerait au premier renvoi ce que ce code ne sait pas lire. */
