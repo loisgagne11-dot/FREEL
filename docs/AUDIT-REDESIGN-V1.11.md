@@ -1677,3 +1677,29 @@ mettait les noms en retrait sous « Client » ; l'aperçu les place au bord
 gauche (ce tableau-là n'a pas d'intitulés, sa première colonne vide ne prend
 aucune place). Tenu par un test nommé, mutation tuée.
 
+
+## 27/11 — Factures : les factures émises dans un autre logiciel (demandé le 22/11)
+
+Aucune maquette ne dessine ces blocs : ils reprennent les composants de
+l'écran (carte, ligne, volet, interrupteur de Réglages) et **se soumettent au
+propriétaire sur capture** avant la fusion. Captures : `node
+scripts/capturer-app.mjs --ecran=factures --port=4192` (et `--largeur=390`),
+`--ecran=reglages-facturation`, Calme et Nuit, relues le 27/11. Les vues
+`factures-externe*` et `reglages-facturation-externe` montrent le compte de
+démonstration, le mode changé au profil.
+
+| Endroit | Avant | Maintenant |
+|---|---|---|
+| Réglages › Facturation, en tête | IBAN, BIC, plateforme, mentions | « Tu émets tes factures avec » : FREEL / Un autre logiciel (l'interrupteur de la périodicité). Avec un autre logiciel : l'aide dit que la numérotation et la conformité relèvent de lui, les mentions et la numérotation de FREEL ne s'affichent plus, l'IBAN dit qu'il ne sert qu'aux factures de FREEL |
+| Factures, haut de l'écran (mode externe) | « La facture de juin 2026 » : Émettre / Ajuster / Rédiger, écart facture / planning | « Les mois en attente » (une ligne par mois et par payeur, « Enregistrer », et « C'est la 2026-008, émise le 4 juin 2026 » quand une facture d'avant ne dit pas son mois), puis « À enregistrer : juin 2026 » (client, jours, montant HT, « Enregistrer la facture émise » ; « Facture … enregistrée pour juin 2026 » une fois faite). Ni « Émettre », ni « Rédiger », ni écart |
+| Factures, en-tête de la liste (mode externe) | « Nouvelle facture » | « Enregistrer une facture » : le même volet, vierge |
+| Volet « Enregistrer une facture émise » | — | Client, mois facturé et montant HT repris du planning ; TVA selon le régime ; numéro du logiciel ; date d'émission ; envoyée « le même jour » / « un autre jour » / « pas encore » ; échéance calculée, corrigeable ; le PDF, contrôlé au choix, et la phrase « elle reste sur cet appareil ». À 390 px, tout tient sans débordement. Relu : les champs étaient séparés de près de 50 px (marges des paragraphes) — resserrés |
+| Ligne d'une facture émise ailleurs | — | Son numéro et « émise dans ton logiciel » ; **pas de « Revoir la facture »** ; « Ouvrir la pièce » quand elle en a une |
+| Ligne de toute facture | « Marquer envoyée » écrivait la date du jour | « Marquer envoyée » ouvre un volet, aujourd'hui proposé ; « Corriger la date d'envoi » (en retrait) sur une facture partie qui attend son règlement ; « Ouvrir la pièce » dès qu'une pièce est jointe |
+| Panneau « Pièce jointe » | Vérifier l'intégrité, Remplacer, Détacher ; la pièce déposée n'y apparaissait qu'après l'avoir refermé | « Ouvrir la pièce » d'abord ; une phrase : la pièce vit sur cet appareil ; le panneau suit la recette. Pour une facture d'un autre logiciel, il dit que la pièce est la seule copie que FREEL en garde |
+| Rédaction (`#/facture/nouvelle`) en mode externe | La rédaction, d'office | « Tes factures s'émettent dans ton logiciel… » ; « Aller à Factures », et « Rédiger quand même avec FREEL — elle prendra un numéro de FREEL » |
+
+**Reste à voir par le propriétaire** : la densité des gestes sur une facture
+partie et en retard (six boutons : Revoir, Corriger la date d'envoi,
+Enregistrer le règlement, Relancer, Annuler par un avoir, Joindre une pièce) ;
+la place des mois en attente au-dessus du mois courant.

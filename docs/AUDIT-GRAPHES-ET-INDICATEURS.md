@@ -1135,3 +1135,28 @@ du PDF, dans le même ordre.
 |---|---|---|---|
 | Jours de la semaine, du client, du mois (V24) | Aperçu du CRA, fichier téléchargé | Aperçu et fichier HTML (le même nœud sérialisé) | Aperçu et PDF, depuis le même modèle ; « 1 / 2 » en pied du PDF, qui n'est pas un nombre de l'activité |
 
+
+## 27/11 — Les factures émises dans un autre logiciel (demandé le 22/11)
+
+Le propriétaire émet dans Tiime ; FREEL suit. Quatre nombres naissent, un
+change de source, aucun n'est retiré. En mode FREEL, l'écran est celui
+d'avant, à une exception : une facture annulée par un avoir ne couvre plus son
+mois (voir le brouillon du mois ci-dessous).
+
+| Nombre | Où il se lit | Avant | Maintenant |
+|---|---|---|---|
+| Montant HT et jours d'un mois à enregistrer † | Factures, « À enregistrer : juin 2026 » (mode externe) | Absent : le brouillon du mois proposait « Émettre » ou « Rédiger », et chiffrait un écart facture / planning | Le brouillon du mois, tel quel (`brouillonsDeFacture`, la source du CRA) : « 10,5 j au planning », « 5 460 € HT ». **Aucun écart** : la facture reprend le planning (22/11) |
+| Mois en attente, un par payeur † | Factures, « Les mois en attente » ; « Mars et mai 2026 : travaillés, et aucune facture enregistrée » | Absent | `moisAEnregistrer` : les douze derniers mois, et le mois en cours quand le payeur n'y a plus de journée à venir. Un mois sort dès qu'une facture le **couvre** (`moisFactureDe` : le mois dit, sinon celui d'émission). Une facture d'avant sans mois dit se rattache d'un geste |
+| Sujets « Enregistrer la facture de mars 2026 » † | « À faire » (Pilote), pastille de Factures | Absent | Un sujet par mois, à faire (jamais en retard : la facture est peut-être émise, c'est FREEL qui ne la connaît pas) ; « Atelier Novak · 2 880 € HT d'après le planning ». La même fonction que l'écran (`moisAEnregistrer`), regroupée par mois. Muet en mode FREEL |
+| TVA et TTC d'une facture à enregistrer † | Volet « Enregistrer une facture émise » | Absent | Selon le régime : rien en franchise ni en autoliquidation (dit en une phrase), sinon le taux choisi et « 576 € de TVA, 3 456 € TTC » |
+| Échéance proposée † | Même volet | Absent | `echeanceDe` sur le délai du client (« Calculée : 45 jours fin de mois »), corrigeable — la facture de Tiime fait foi |
+| Mois couvert par une facture (« déjà émise ») | Brouillon du mois (mode FREEL) | Le mois d'émission ; une facture annulée par un avoir comptait encore | Le mois dit s'il y en a un, sinon celui d'émission — la même règle que les mois en attente ; une facture annulée ne couvre plus rien, le mois redevient à facturer |
+| Date d'envoi | Ligne d'une facture, « envoyée le … » | Toujours le jour du clic | La date choisie (aujourd'hui proposé), corrigeable tant que la facture attend son règlement |
+
+**Non-régression vérifiée** : « Reste à rentrer », « Dont en retard »,
+« Encaissé sur la période » et « Recouvrement » lisent les recettes, d'où
+qu'elles viennent — une facture de Tiime y entre comme une de FREEL (test).
+Une facture encaissée sans mode de règlement reste **encaissée** — le statut
+se lit sur la date seule — et son manque reste un sujet « à compléter » du
+livre, jamais un retard (tests nommés). La suite de numérotation du livre
+n'additionne plus les numéros d'un autre logiciel ; les doublons, si.

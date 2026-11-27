@@ -130,6 +130,10 @@ describe('les factures émises dans un autre logiciel', () => {
     });
     expect(numeroSuivant(useFaits.getState().faits)).toBe(avant);
     await screen.findByText(/aucun numéro de FREEL n’a été pris/);
+    // Elle entre au reste à rentrer comme une facture de FREEL : c'est tout
+    // l'intérêt de l'enregistrer.
+    const tuile = screen.getByText('Reste à rentrer').closest('div') as HTMLElement;
+    expect((tuile.textContent ?? '').replace(/[\u202f\u00a0]/gu, ' ')).toContain('11 000 €');
     expect(screen.queryByRole('button', { name: 'Enregistrer la facture de juillet 2026 pour Client France' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Enregistrer la facture de juin 2026 pour Client France' })).toBeTruthy();
   });
