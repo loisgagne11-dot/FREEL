@@ -270,6 +270,9 @@ export function consignerRelance(id: string, le: DateISO): void {
  * sans réponse à « je ne l'ai jamais reçue ». Une DATE et non un booléen : un
  * statut qu'aucune date ne prouve ne prouve rien. Rend le motif du refus, ou
  * `null`.
+ *
+ * Elle se réécrit : c'est ainsi qu'elle se CORRIGE. Elle n'est imprimée sur
+ * aucun document, contrairement à la date d'émission.
  */
 export function marquerEnvoyee(id: string, le: DateISO): string | null {
   const actuel = faitsCourants();
@@ -286,6 +289,11 @@ export function marquerEnvoyee(id: string, le: DateISO): string | null {
   if (le < recette.emiseLe) {
     return 'Une facture ne peut pas partir avant d’exister : la date d’envoi '
       + 'est antérieure à sa date d’émission.';
+  }
+  // La date se choisit désormais (22/11) : un envoi daté de demain ferait
+  // courir la relance d'une facture qui n'est pas partie.
+  if (le > dateDuJour()) {
+    return 'Cette date n’est pas encore arrivée : on consigne un envoi fait, pas prévu.';
   }
   ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) =>
     (r.id === id ? { ...r, envoyeeLe: le } : r))));
