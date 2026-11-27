@@ -499,7 +499,7 @@ export class DocumentPdf {
    * Le numéro se pose À LA FIN, quand on connaît le total : c'est lui qui dit
    * au client qu'aucune page ne manque — « 1 / 1 » compris.
    */
-  terminer(): Uint8Array {
+  terminer(): Uint8Array<ArrayBuffer> {
     const pied = this.meta.pied ?? { taille: 7.5, couleur: '#808080', depuisLeBas: 24 };
     const total = this.pages.length;
     // Une copie, pas un ajout : un second `terminer()` ne doit pas poser

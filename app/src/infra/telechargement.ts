@@ -10,6 +10,11 @@
  * déjà rendre. « Imprimer → Enregistrer en PDF » donne le même fichier, sans
  * le poids, et avec la mise en page que l'utilisateur vient de voir à l'écran.
  *
+ * Le compte rendu d'activité, lui, se télécharge en VRAI PDF depuis le 27/11
+ * (demande du propriétaire) : `infra/pdf`, quelques kilo-octets écrits pour
+ * l'occasion et chargés au clic, toujours sans bibliothèque. La facture garde
+ * le fichier HTML ci-dessous.
+ *
  * ─────────────────────────────────────────────────────────────────────────
  * LE FICHIER TÉLÉCHARGÉ EST AUTONOME, ET C'EST TOUT L'ENJEU
  * ─────────────────────────────────────────────────────────────────────────
@@ -19,10 +24,11 @@
  * CSS avec lui. Sans cela, le client reçoit un tableau sans bordures ni
  * alignement — un document qui ne se signe pas.
  *
- * Le nom de fichier finit en `.html` et jamais en `.pdf` : un fichier HTML
+ * Le nom de ce fichier finit en `.html` et jamais en `.pdf` : un fichier HTML
  * nommé `.pdf` ne s'ouvre nulle part, et promettre un PDF qu'on ne produit pas
  * est exactement le genre de petit mensonge d'interface que ce projet évite.
- * Le bouton dit « Télécharger », et « Imprimer » mène au PDF.
+ * Le bouton dit « Télécharger », et « Imprimer » mène au PDF. « Télécharger le
+ * PDF », sur le compte rendu, n'existe que parce qu'il en produit un.
  */
 
 /** Le document complet, prêt à vivre seul dans un fichier. */
