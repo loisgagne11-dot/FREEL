@@ -89,6 +89,23 @@ describe('le PDF du compte rendu', () => {
     expect(normal(textes.join(''))).toBe(normal(texteDeLApercu(modele)));
   });
 
+  /* Relu à côté de l'aperçu : le tableau des totaux n'a pas d'intitulés, sa
+     première colonne vide ne prend aucune place, et les noms y partent du
+     bord gauche. Le PDF les mettait en retrait, sous « Client ». */
+  it('place les noms des totaux au bord gauche, comme l’aperçu', () => {
+    const modele = modeleDuCra(
+      syntheseHebdomadaire(mois('2026-06'), juin(['Alpha', 'Beta'])), entreprise, null, {}
+    );
+    const textes = relirePdf(pdfDuCra(modele, CREATION)).pages.flat();
+    const bordGauche = textes.find((t) => t.texte === 'Semaine 1')?.x ?? NaN;
+    const dansLesSemaines = textes.filter((t) => t.texte === 'Alpha' && t.polices[0] === 'F1');
+    const dansLesTotaux = textes.filter((t) => t.texte === 'Alpha' && t.polices[0] === 'F2');
+
+    expect(dansLesTotaux).toHaveLength(1);
+    expect(dansLesTotaux[0]?.x).toBeCloseTo(bordGauche, 2);
+    for (const t of dansLesSemaines) expect(t.x).toBeGreaterThan(bordGauche + 50);
+  });
+
   it('se nomme comme le document', () => {
     const modele = modeleDuCra(
       syntheseHebdomadaire(mois('2026-06'), juin(['Client Alpha'])), entreprise, 'Client Alpha', {}
@@ -141,6 +158,29 @@ describe('le PDF du compte rendu', () => {
     });
     expect(normal(sansRepetition.flat().join(''))).toBe(normal(texteDeLApercu(modele)));
   });
+});
+
+/*
+ * LES TOTAUX COUPÉS REDISENT LEUR TITRE.
+ *
+ * Vu sur la démonstration, tous clients, juin : la dernière ligne de totaux
+ * passait seule en page 2, sans titre — un « 10,5 j » qu'on lirait comme une
+ * semaine de plus. Vingt clients sur une semaine : le tableau des semaines
+ * tient sur la première page, celui des totaux déborde.
+ */
+it('redit le titre des totaux quand leur tableau passe à la page suivante', () => {
+  const clients = Array.from({ length: 20 }, (_, i) => `Client ${String(i + 1).padStart(2, '0')}`);
+  const jours: JourTravaille[] = clients.map((client) => ({
+    date: dateISO('2026-06-02'), client, quotite: 1, lieu: 'sur_site'
+  }));
+  const modele = modeleDuCra(syntheseHebdomadaire(mois('2026-06'), jours), entreprise, null, {});
+  const pages = textesDuPdf(relirePdf(pdfDuCra(modele, CREATION)));
+
+  expect(pages).toHaveLength(2);
+  expect(pages[0]).toContain('TOTAUX DU MOIS PAR CLIENT');
+  expect(pages[1]?.[0]).toBe('TOTAUX DU MOIS PAR CLIENT');
+  expect(normal([...(pages[0] ?? []), ...(pages[1] ?? []).slice(1)].join('')))
+    .toBe(normal(texteDeLApercu(modele)));
 });
 
 /** La valeur d'une propriété pour un sélecteur exact de la feuille. */

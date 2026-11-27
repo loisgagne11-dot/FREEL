@@ -209,13 +209,22 @@ function intitules(c: Contexte): void {
 const tailleCellule = px(S.cellule.taille);
 const ligneCellule = tailleCellule * S.interligne;
 
-/** Une ligne de volume : sa hauteur d'abord (pour réserver la place), puis son dessin. */
+/**
+ * Une ligne de volume : sa hauteur d'abord (pour réserver la place), puis son
+ * dessin.
+ *
+ * Dans les totaux par client (`decale` faux), le nom part du bord gauche :
+ * c'est ce que montre l'aperçu, où ce tableau-là n'a pas d'intitulés et où
+ * sa première colonne, vide, ne prend aucune place. Les chiffres, eux,
+ * restent sur la grille du tableau des semaines — voir la liste de sortie.
+ */
 function ligneVolume(c: Contexte, v: LigneVolumeCra, decale: boolean): { hauteur: number; dessiner: () => void } {
   const { pdf, fil, x, l, modele } = c;
   const b = bords(c);
   const policeClient: Police = decale ? 'normal' : 'gras';
+  const xClient = decale ? (b[1] as number) : x;
   const finClient = x + (modele.lieuConnu ? FIN_CLIENT.avecLieu : FIN_CLIENT.sansLieu) * l;
-  const lignesClient = couperEnLignes(v.client, policeClient, tailleCellule, finClient - (b[1] as number));
+  const lignesClient = couperEnLignes(v.client, policeClient, tailleCellule, finClient - xClient);
   const n = Math.max(lignesClient.length, v.sansLieu === null ? 1 : 2);
   const hauteur = 2 * px(S.cellule.vertical) + n * ligneCellule + px(1);
 
@@ -225,7 +234,7 @@ function ligneVolume(c: Contexte, v: LigneVolumeCra, decale: boolean): { hauteur
       const haut = fil.y + px(S.cellule.vertical);
       const y0 = base(haut, ligneCellule, tailleCellule);
       lignesClient.forEach((t, i) => {
-        pdf.texte(b[1] as number, y0 + i * ligneCellule, t, { police: policeClient, taille: tailleCellule, couleur: S.encre });
+        pdf.texte(xClient, y0 + i * ligneCellule, t, { police: policeClient, taille: tailleCellule, couleur: S.encre });
       });
       if (v.teletravail !== null) {
         pdf.texte(b[2] as number, y0, v.teletravail, { taille: tailleCellule, couleur: S.encre }, 'droite');
