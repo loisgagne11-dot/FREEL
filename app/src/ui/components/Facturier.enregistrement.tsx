@@ -162,7 +162,7 @@ export function FormulaireFactureEmise(
     /* `noValidate` : les refus se disent en phrases, par l'écriture elle-même
        (`enregistrerFactureEmise`), et non par la bulle du navigateur — qui ne
        sait pas dire pourquoi une échéance ne précède pas l'émission. */
-    <form className={styles.panneau} noValidate onSubmit={(e) => { e.preventDefault(); void enregistrer(); }}>
+    <form className={`${styles.panneau} ${styles.saisieFacture}`} noValidate onSubmit={(e) => { e.preventDefault(); void enregistrer(); }}>
       <p className={styles.aide}>
         Recopie ce que porte la facture de ton logiciel. FREEL ne lui donne pas
         de numéro et n’en produit pas le document&nbsp;: elle entre au suivi —

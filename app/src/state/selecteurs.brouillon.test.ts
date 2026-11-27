@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type DateISO, dateISO, euros, mois } from '../domain/types';
 import { type Faits, type Mission, type Recette, faitsVides } from './schema';
-import { brouillonsDeFacture, moisAEnregistrer } from './selecteurs.brouillon';
+import { brouillonsDeFacture, facturesARattacher, moisAEnregistrer } from './selecteurs.brouillon';
 
 /** Du lundi au vendredi, à 500 € la journée, chez un seul client. */
 const mission = (du: string, au: string): Mission => ({
@@ -96,5 +96,33 @@ describe('le montant d’un mois est celui du planning', () => {
     // Vingt-trois jours de semaine, moins le 14 juillet, férié.
     expect(b?.jours).toBe(22);
     expect(b?.total).toBe(11_000);
+  });
+});
+
+describe('une facture déjà au livre, qui ne dit pas son mois', () => {
+  /*
+   * La facture de juillet émise le 3 août, d'avant le schéma 29 : elle couvre
+   * août à défaut de mieux, et juillet reste en attente. La réenregistrer est
+   * refusé — son numéro est au livre —, et sans elle, juillet attendrait un an.
+   */
+  it('se propose pour le mois en attente qui la précède', () => {
+    const f = faits([facture({ id: 'r1', emiseLe: dateISO('2026-08-03') })]);
+    const juillet = moisAEnregistrer(f, new Date('2026-10-14T09:00:00')).find((b) => b.mois === '2026-07');
+    if (juillet === undefined) throw new Error('juillet devrait attendre');
+    expect(facturesARattacher(f, juillet).map((r) => r.id)).toEqual(['r1']);
+  });
+
+  /* Une facture qui dit déjà son mois ne se déplace pas d'un clic : elle en
+     sortirait un autre de la liste sans que rien ne le montre. Un avoir, ou la
+     facture qu'il annule, ne couvre rien. */
+  it('ne propose ni une facture au mois dit, ni un avoir, ni une facture annulée', () => {
+    const f = faits([
+      facture({ id: 'dite', emiseLe: dateISO('2026-08-03'), moisFacture: mois('2026-08') }),
+      facture({ id: 'annulee', emiseLe: dateISO('2026-08-04') }),
+      facture({ id: 'avoir', emiseLe: dateISO('2026-08-04'), montant: euros(-1000), annuleEcriture: 'annulee' })
+    ]);
+    const juillet = moisAEnregistrer(f, new Date('2026-10-14T09:00:00')).find((b) => b.mois === '2026-07');
+    if (juillet === undefined) throw new Error('juillet devrait attendre');
+    expect(facturesARattacher(f, juillet)).toEqual([]);
   });
 });

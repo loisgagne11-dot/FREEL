@@ -521,3 +521,9 @@ a.actionLigne:focus-visible {
   color: var(--text);
   cursor: pointer;
 }
+
+/* Les volets d'une facture émise ailleurs et de la date d'envoi empilent des
+   paragraphes : leurs marges s'ajoutaient à l'écart du panneau, et la capture
+   montrait des champs séparés de près de cinquante pixels — un formulaire
+   qu'on lit comme une suite de blocs sans rapport. */
+.saisieFacture p { margin: 0; }

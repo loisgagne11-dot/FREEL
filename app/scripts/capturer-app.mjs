@@ -134,6 +134,15 @@ const VUES = [
      d'ailleurs, ce que fait l'action rapide du Pilote. */
   { hash: '#/activite/compte-rendu', nom: 'activite-compte-rendu-atelier', handoff: 'pilote-cra', attendre: '[role="dialog"]' },
   { hash: '#/factures', nom: 'factures', handoff: 'activite-factures', attendre: 'button:has-text("Nouvelle facture")' },
+  /* Les factures émises dans un autre logiciel (22/11) : le même compte, le
+     mode changé au profil. Sans ces vues, aucune capture ne montrerait les
+     mois en attente ni le formulaire — qui ne s'ouvre qu'au clic. */
+  { hash: '#/factures', nom: 'factures-externe', externe: true, attendre: 'h2:has-text("Les mois en attente")' },
+  { hash: '#/factures', nom: 'factures-externe-enregistrer', externe: true,
+    avantDOuvrir: 'h2:has-text("Les mois en attente")', ouvrir: ['Enregistrer la facture de mars 2026 pour Atelier Novak'],
+    attendre: '[role="dialog"] label:has-text("Numéro de la facture")', cadre: true, hauteur: 1500 },
+  { hash: '#/reglages/facturation', nom: 'reglages-facturation-externe', externe: true,
+    attendre: 'text=relèvent alors de ce logiciel' },
   { hash: '#/factures/clients', nom: 'factures-clients', handoff: 'activite-clients', attendre: 'h2:has-text("Carnet")' },
   /* La rédaction, avec son aperçu vivant : elle s'apparie à
      `pilote-nouvelle-facture` du handoff. L'écran n'est pas une modale chez
@@ -424,6 +433,19 @@ for (const theme of THEMES) {
        `networkidle` l'attendait jusqu'à ce que l'application l'abandonne, et
        la photo montrait « Hors ligne ». Cette vue-là n'attend que la page. */
     const jusqua = vue.reseauEnSuspens === true ? 'load' : 'networkidle';
+    /* Le mode « autre logiciel » : les faits de la démonstration, le profil
+       changé, posés comme ceux du Compte — et retirés après la photo, par un
+       rechargement, pour que la vue suivante retrouve la démonstration. */
+    if (vue.hauteur !== undefined) await page.setViewportSize({ width: LARGEUR, height: vue.hauteur });
+    if (vue.externe === true) {
+      await page.goto(`${base}#/`, { waitUntil: 'networkidle' });
+      await page.evaluate((faits) => {
+        sessionStorage.setItem('capture.faits', '1');
+        localStorage.setItem('freel.faits.v1', JSON.stringify(faits));
+      }, { ...JEU, entreprise: { ...JEU.entreprise, emissionFactures: 'externe' } });
+      await page.goto(base + vue.hash, { waitUntil: jusqua });
+      await page.reload({ waitUntil: jusqua });
+    }
     if (vue.compte !== undefined) {
       await page.goto(`${base}#/`, { waitUntil: 'networkidle' });
       await page.evaluate(preparerCompte, { ...vue.compte, jeu: JEU, projet: PROJET_FACTICE });
@@ -505,10 +527,19 @@ for (const theme of THEMES) {
     /* Un volet du téléphone est fixé à l'écran : photographié en pleine page,
        il flotte au milieu d'une image de trois écrans de haut. On prend alors
        ce que l'œil voit — l'écran, le volet ouvert dessus. */
-    const pleinePage = !(vue.cadreAuTelephone === true && LARGEUR < 761);
+    /* Un volet plus haut que l'écran (le formulaire d'une facture émise
+       ailleurs) se photographie sur une fenêtre agrandie à sa hauteur
+       (`hauteur`), et cadré (`cadre`) : en pleine page, seul son premier
+       écran figurait, le dépôt du PDF et le bouton coupés. */
+    const pleinePage = !((vue.cadreAuTelephone === true && LARGEUR < 761) || vue.cadre === true);
     await page.screenshot({ path: join(SORTIE, `${theme}-${vue.nom}${suffixe}.png`), fullPage: pleinePage });
     capturees += 1;
     if (vue.compte !== undefined) await page.evaluate(oublierCompte);
+    if (vue.hauteur !== undefined) await page.setViewportSize({ width: LARGEUR, height: 960 });
+    if (vue.externe === true) {
+      await page.evaluate(() => sessionStorage.removeItem('capture.faits'));
+      await page.reload({ waitUntil: jusqua });
+    }
     if (erreurs.length > 0) {
       manquees.push(`${theme}-${vue.nom} capturé MAIS erreur JS : ${erreurs[0]}`);
     }

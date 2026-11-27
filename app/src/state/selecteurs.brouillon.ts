@@ -22,7 +22,7 @@ import {
 import { MOIS_EN_ATTENTE_MAX, moisFactureDe } from '../domain/calculs/emission';
 import { decalerMois } from '../domain/calculs/periode';
 import { previsionDuMois } from '../domain/calculs/prevision';
-import type { Faits } from './schema';
+import type { Faits, Recette } from './schema';
 import { dateDuJour } from './selecteurs';
 import { libelleDeLaLigne, planningsDuMois } from './selecteurs.prevision';
 
@@ -114,6 +114,36 @@ function facturesEmisesDuMois(faits: Faits, m: Mois): ReadonlyMap<string, Factur
     });
   }
   return parClient;
+}
+
+/**
+ * Les factures déjà au livre qui couvrent PEUT-ÊTRE ce mois en attente.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * LE MOIS QU'ON NE POUVAIT PAS FAIRE SORTIR DE LA LISTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Une facture d'avant le schéma 29 ne dit pas son mois : elle couvre, à
+ * défaut, celui de son émission. La facture de mai émise le 4 juin laissait
+ * donc mai « en attente » — et l'enregistrer depuis la liste était refusé,
+ * son numéro étant déjà au livre. Le mois restait là un an, faux, et la liste
+ * apprenait à ne plus être lue.
+ *
+ * Proposées : les factures à ce payeur, émises ce mois-là ou le suivant — la
+ * facture d'un mois part à sa fin ou au début de l'autre —, qui ne disent pas
+ * leur mois et ne sont ni un avoir ni annulées. Deux mois de plus la faisaient
+ * proposer à deux lignes à la fois, sans dire laquelle elle couvre.
+ * Une facture qui dit déjà son mois n'est jamais proposée : la déplacer d'un
+ * clic en sortirait un autre mois sans que rien ne le montre.
+ */
+export function facturesARattacher(faits: Faits, b: BrouillonDeFacture): readonly Recette[] {
+  const annulees = new Set(faits.recettes.flatMap((r) =>
+    (typeof r.annuleEcriture === 'string' ? [r.annuleEcriture] : [])));
+  const jusqua = decalerMois(b.mois, 1);
+  return faits.recettes.filter((r) => r.clientNom === b.clientNom
+    && r.emiseLe !== null && r.moisFacture == null
+    && r.emiseLe.slice(0, 7) >= b.mois && r.emiseLe.slice(0, 7) <= jusqua
+    && typeof r.annuleEcriture !== 'string' && !annulees.has(r.id));
 }
 
 /**

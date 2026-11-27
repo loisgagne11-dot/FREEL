@@ -38,7 +38,7 @@ export function PanneauEnvoi(
   const id = useId();
 
   return (
-    <div className={styles.panneau}>
+    <div className={`${styles.panneau} ${styles.saisieFacture}`}>
       <p className={styles.rappel}>
         {r.numero || 'Sans numéro'} — {r.clientNom || 'client non renseigné'}
         <span>émise le {dateCourte(r.emiseLe)}</span>

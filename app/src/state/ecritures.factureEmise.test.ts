@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { dateISO, euros, mois } from '../domain/types';
 import { type Recette, faitsVides } from './schema';
 import { useFaits } from './store';
-import { type SaisieFactureEmise, ajouterRecette, enregistrerFactureEmise } from './ecritures.recettes';
+import { type SaisieFactureEmise, ajouterRecette, annulerRecette, enregistrerFactureEmise, rattacherAuMois } from './ecritures.recettes';
 import { numeroSuivant, reediterFacture } from './selecteurs.facture';
 
 beforeEach(() => {
@@ -92,5 +92,32 @@ describe('enregistrer une facture émise dans un autre logiciel', () => {
     enregistrerFactureEmise(saisie(), AUJOURDHUI);
     const r = reediterFacture(useFaits.getState().faits, 'F-2026-0042');
     expect(r).toEqual({ cas: 'impossible', motif: expect.stringMatching(/émise dans ton logiciel/) });
+  });
+});
+
+describe('dire le mois d’une facture déjà au livre', () => {
+  it('pose le mois, sans toucher au reste de la facture', () => {
+    const id = ajouterRecette({
+      clientNom: 'Client France', libelle: 'Prestation', montant: euros(1000),
+      emiseLe: dateISO('2026-08-03'), encaisseeLe: null, modeReglement: null
+    });
+    expect(rattacherAuMois(id, mois('2026-07'))).toBeNull();
+    expect(recettes()[0]).toMatchObject({ moisFacture: '2026-07', numero: '2026-001', montant: 1000 });
+  });
+
+  /* Un avoir suit la facture qu'il annule : lui donner un mois en ferait une
+     facture de ce mois-là, et le mois sortirait de la liste sur un avoir. */
+  it('refuse un avoir et un brouillon', () => {
+    const id = ajouterRecette({
+      clientNom: 'Client France', libelle: 'Prestation', montant: euros(1000),
+      emiseLe: dateISO('2026-08-03'), encaisseeLe: null, modeReglement: null
+    });
+    annulerRecette(id, dateISO('2026-08-10'));
+    expect(rattacherAuMois(`${id}-annulation`, mois('2026-07'))).toMatch(/avoir/);
+    const brouillon = ajouterRecette({
+      clientNom: 'Client France', libelle: 'Prestation', montant: euros(1000),
+      emiseLe: null, encaisseeLe: null, modeReglement: null
+    });
+    expect(rattacherAuMois(brouillon, mois('2026-07'))).toMatch(/brouillon/);
   });
 });

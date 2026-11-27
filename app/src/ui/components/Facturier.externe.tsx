@@ -1,13 +1,16 @@
 import { useMemo } from 'react';
 import { useFaits } from '../../state/store';
-import { brouillonsDeFacture, moisAEnregistrer } from '../../state/selecteurs.brouillon';
+import { brouillonsDeFacture, facturesARattacher, moisAEnregistrer } from '../../state/selecteurs.brouillon';
+import { rattacherAuMois } from '../../state/ecritures.recettes';
+import type { Faits } from '../../state/schema';
+import { useToast } from './Toasts';
 import type { BrouillonDeFacture } from '../../domain/calculs/brouillon';
 import { decalerMois } from '../../domain/calculs/periode';
 import type { Mois } from '../../domain/types';
 import { deMois } from '../../domain/calculs/aTraiter.libelles';
 import { Info } from './Info';
 import { Montant } from './Montant';
-import { eur, formaterJours, moisLong } from '../format';
+import { dateCourte, eur, formaterJours, moisLong } from '../format';
 import styles from './Facturier.module.css';
 
 /**
@@ -39,7 +42,7 @@ export function FacturesAEnregistrer(
 
   return (
     <>
-      {attente.length > 0 && <MoisEnAttente attente={attente} onEnregistrer={onEnregistrer} />}
+      {attente.length > 0 && <MoisEnAttente faits={faits} attente={attente} onEnregistrer={onEnregistrer} />}
       {duMois.length > 0 && (
         <section className={styles.carte} aria-labelledby="titre-a-enregistrer">
           <header className={styles.entete}>
@@ -112,11 +115,13 @@ export function FacturesAEnregistrer(
  * août, septembre ».
  */
 function MoisEnAttente(
-  { attente, onEnregistrer }: {
+  { faits, attente, onEnregistrer }: {
+    readonly faits: Faits;
     readonly attente: readonly BrouillonDeFacture[];
     readonly onEnregistrer: (b: BrouillonDeFacture) => void;
   }
 ) {
+  const signaler = useToast();
   const lesMois = [...new Set(attente.map((b) => b.mois))];
   return (
     <section className={styles.carte} aria-labelledby="titre-mois-en-attente">
@@ -128,7 +133,8 @@ function MoisEnAttente(
             en cours dès qu’il n’y reste plus de journée à venir —, pour lequel
             aucune facture à ce client n’est enregistrée. Il sort de la liste
             dès qu’une facture le couvre&nbsp;: c’est le mois que tu indiques en
-            l’enregistrant, ou à défaut celui de son émission.
+            l’enregistrant, ou à défaut celui de son émission. Une facture
+            déjà au livre qui ne dit pas son mois se désigne d’un geste.
           </Info>
         </h2>
       </header>
@@ -152,6 +158,18 @@ function MoisEnAttente(
                 onClick={() => onEnregistrer(b)}>
                 Enregistrer
               </button>
+              {/* La facture est peut-être déjà au livre, sans mois dit : la
+                  réenregistrer serait refusé (son numéro y est), et le mois
+                  resterait en attente un an. On la désigne d'un geste. */}
+              {facturesARattacher(faits, b).map((r) => (
+                <button key={r.id} type="button" className={styles.actionSecondaire}
+                  onClick={() => {
+                    const motif = rattacherAuMois(r.id, b.mois);
+                    signaler(motif ?? `La facture ${r.numero || 'sans numéro'} couvre désormais ${moisLong(b.mois)}.`);
+                  }}>
+                  C’est la {r.numero || 'facture sans numéro'}, émise le {dateCourte(r.emiseLe)}
+                </button>
+              ))}
             </span>
           </li>
         ))}

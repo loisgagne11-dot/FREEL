@@ -157,6 +157,26 @@ export function enregistrerFactureEmise(
   return { id: recette.id };
 }
 
+/**
+ * Dit le mois qu'une facture déjà au livre couvre — celle d'avant le schéma
+ * 29, qui ne le disait pas. Rend le motif du refus, ou `null`.
+ *
+ * Le mois couvert n'est imprimé par FREEL sur aucun document — la réédition
+ * lit les lignes conservées —, c'est un fait de suivi : le dire ne réécrit
+ * pas une facture que le client a reçue. Un avoir n'a pas de mois à lui : il
+ * suit la facture qu'il annule.
+ */
+export function rattacherAuMois(id: string, mois: Mois): string | null {
+  const actuel = faitsCourants();
+  const recette = actuel.recettes.find((r) => r.id === id);
+  if (recette === undefined) return 'Recette introuvable.';
+  if (recette.emiseLe === null) return 'Ce brouillon n’est pas émis : il ne couvre encore aucun mois.';
+  if (typeof recette.annuleEcriture === 'string') return 'Un avoir suit la facture qu’il annule : il n’a pas de mois à lui.';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/u.test(mois)) return 'Ce mois n’a pas une forme lisible.';
+  ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) => (r.id === id ? { ...r, moisFacture: mois } : r))));
+  return null;
+}
+
 /** Ce qu'un brouillon garde de la rédaction : tout, sauf la date et le numéro. */
 export type SaisieBrouillon = Pick<Recette, 'clientNom' | 'libelle' | 'montant' | 'tvaCollectee' | 'lignes' | 'referenceCommande'>;
 

@@ -185,6 +185,21 @@ describe('les factures émises dans un autre logiciel', () => {
     expect(within(ligneExterne).getByText('F-2026-0042')).toBeTruthy();
   });
 
+  /*
+   * UN MOIS FACTURÉ AVANT LE SCHÉMA 29 SORT AUSSI DE LA LISTE. La facture de
+   * juillet émise le 3 août ne disait pas son mois : juillet restait « en
+   * attente », et l'enregistrer depuis la liste était refusé — son numéro est
+   * au livre. On la désigne, et juillet sort.
+   */
+  it('rattache à son mois une facture déjà au livre qui ne le disait pas', async () => {
+    semer([facture({ id: 'r1', numero: '2026-007', emiseLe: dateISO('2026-08-03') })]);
+    rendre();
+    await userEvent.click(await screen.findByRole('button', { name: 'C’est la 2026-007, émise le 3 août 2026' }));
+
+    expect(recettes()[0]?.moisFacture).toBe('2026-07');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Enregistrer la facture de juillet 2026 pour Client France' })).toBeNull());
+  });
+
   /* Avec FREEL, rien ne change : le brouillon du mois propose d'émettre. */
   it('avec FREEL, le brouillon du mois reste, sans liste d’attente', () => {
     semer([], 'freel');
