@@ -118,6 +118,17 @@ const VUES = [
      voir la note sur l'ancrage exact des libellés, plus bas. */
   { hash: '#/activite', nom: 'activite-planning', handoff: 'activite-plan-de-charge' },
   { hash: '#/activite', nom: 'activite-mois', handoff: 'activite-mois', ouvrir: ['Mois'] },
+  /* Les jours fériés (22/11) : juin, le mois de l'horloge, n'en a aucun. Mai
+     en a quatre — le 1ᵉʳ, le 8, l'Ascension le jeudi 14 et Pentecôte le 25 —,
+     et la semaine du 11 porte l'Ascension en son milieu. Sans ces vues, aucune
+     capture ne montrerait la teinte ni le nom. */
+  /* `recharger` : le mois est celui de l'application, et il survit à un
+     changement d'adresse. Sans rechargement, la vue du mois partait du mai
+     laissé par la vue de la semaine, et « Mois précédent » photographiait
+     avril. */
+  { hash: '#/activite', nom: 'activite-planning-ferie', recharger: true,
+    ouvrir: ['Semaine précédente', 'Semaine précédente', 'Semaine précédente', 'Semaine précédente'] },
+  { hash: '#/activite', nom: 'activite-mois-ferie', recharger: true, ouvrir: ['Mois', 'Mois précédent'] },
   /* Le carnet de commandes (lot 48) arrive avec son onglet, à la demande :
      sans l'attendre, la photo pouvait montrer « Chargement… ». */
   { hash: '#/activite', nom: 'activite-missions', handoff: 'activite-missions', ouvrir: ['Missions'],
@@ -453,6 +464,7 @@ for (const theme of THEMES) {
       await page.reload({ waitUntil: jusqua });
     }
     await page.goto(base + vue.hash, { waitUntil: jusqua });
+    if (vue.recharger === true) await page.reload({ waitUntil: jusqua });
     // Les écrans sont chargés à la demande : on attend le titre, sinon on
     // capturerait l'écran d'attente. `h1:visible` parce qu'un changement de
     // hash laisse le précédent monté en `display: none` pendant la suspension.

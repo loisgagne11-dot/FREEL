@@ -4,6 +4,7 @@ import type { DateISO } from '../../domain/types';
 import { dateCourte } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
 import { ConfirmationSurPlace } from './ConfirmationSurPlace';
+import { feriesDeLaPeriode, nommerLeFerie } from './planning.ferie';
 import styles from './VueSemaine.module.css';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -125,11 +126,25 @@ export function VueSemaine(
           return (
             <div
               key={jour.date}
-              className={`${styles.colonne} ${estAujourdhui ? styles.colonneDuJour : ''}`}
+              className={[
+                styles.colonne,
+                estAujourdhui ? styles.colonneDuJour : '',
+                jour.ferie ? styles.colonneFerie : ''
+              ].filter((c) => c !== '').join(' ')}
+              {...(jour.nomDuFerie !== null ? { title: jour.nomDuFerie.nom } : {})}
             >
               <div className={styles.enteteJour}>
                 <span aria-hidden="true">{JOURS[index]} {numero}</span>
                 <span className={styles.invisible}>{dateCourte(jour.date)}</span>
+                {/* Sous la date, comme on l'écrit sur un agenda. Une colonne de
+                    téléphone ne tient pas « Assomption » : elle dit « férié »,
+                    et la légende donne le nom — voir `VueMois`. */}
+                {jour.nomDuFerie !== null && (
+                  <span className={styles.nomFerie} aria-hidden="true">
+                    <span className={styles.ferieLarge}>{jour.nomDuFerie.court}</span>
+                    <span className={styles.ferieEtroit}>férié</span>
+                  </span>
+                )}
               </div>
 
               {jour.creneaux.map((creneau) => (
@@ -160,6 +175,12 @@ export function VueSemaine(
           <span className={`${styles.pastille} ${styles.pastilleConge}`} aria-hidden="true" />
           Congé
         </li>
+        {feriesDeLaPeriode(planning.jours).map((f) => (
+          <li key={f.date} className={styles.legendeEntree}>
+            <span className={`${styles.pastille} ${styles.pastilleFerie}`} aria-hidden="true" />
+            {f.jour}&nbsp;: {f.nom}
+          </li>
+        ))}
         {/* Ici le pictogramme est MUET : son nom est écrit juste à côté, et
             `MarqueLieu` le répéterait hors écran — un lecteur d'écran
             entendrait « télétravail télétravail ». */}
@@ -282,7 +303,9 @@ function CaseDeCreneau(
       )}
 
       {enConge && <span className={styles.motCase} aria-hidden="true">Congé</span>}
-      {libre && <span className={styles.motLibre} aria-hidden="true">libre</span>}
+      {/* Un férié n'est pas « libre » : c'est un jour chômé, et l'en-tête de
+          la colonne le nomme déjà. Les deux mots ensemble se contrediraient. */}
+      {libre && !jour.ferie && <span className={styles.motLibre} aria-hidden="true">libre</span>}
     </button>
   );
 }
@@ -335,11 +358,13 @@ function etatDuCreneau(jour: JourDeLaSemaine, creneau: CreneauDuJour): string {
   const noms = creneau.occupants
     .map((o) => (o.description !== '' ? `${o.nom}, ${o.description}` : o.nom))
     .join(' et ');
+  const ferie = nommerLeFerie(jour);
   if (noms !== '') {
     const ajuste = creneau.occupants.some((o) => o.ajuste) ? ', ajusté' : '';
-    return `${noms}${ajuste}`;
+    // Une astreinte un férié se dit avec le férié : voir `VueMois`.
+    return `${noms}${ajuste}${ferie === null ? '' : `, ${ferie}`}`;
   }
-  if (jour.ferie) return 'jour férié';
+  if (ferie !== null) return ferie;
   if (jour.conge > 0) return 'congé';
   if (jour.weekEnd) return 'week-end';
   return 'libre';

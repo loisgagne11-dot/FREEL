@@ -3,6 +3,7 @@ import type { Creneau } from '../../domain/calculs/planning';
 import type { DateISO } from '../../domain/types';
 import { dateCourte, initiales } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
+import { feriesDeLaPeriode, nommerLeFerie } from './planning.ferie';
 import styles from './VueMois.module.css';
 
 const ENTETES = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM'];
@@ -147,6 +148,16 @@ export function VueMois(
           <span className={styles.initialesLegende} aria-hidden="true">C</span>
           Congé
         </li>
+        {/* Le jour du mois tient lieu d'initiales : c'est lui qu'on cherche
+            dans la grille pour retrouver la case teintée. */}
+        {feriesDeLaPeriode(planning.jours).map((f) => (
+          <li key={f.date} className={styles.legendeEntree}>
+            <span className={`${styles.pastille} ${styles.pastilleFerie}`} aria-hidden="true" />
+            {/* Lu, lui : « 14 Ascension » dit où, et non un code comme « SL ». */}
+            <span className={styles.initialesLegende}>{f.jour}</span>
+            {f.nom}
+          </li>
+        ))}
         <li className={styles.legendeEntree}>
           <span className={styles.lieu} aria-hidden="true">⌂</span>télétravail
         </li>
@@ -180,12 +191,24 @@ function CaseDeJour(
   ].filter((c) => c !== '').join(' ');
 
   return (
-    <div className={classes}>
+    <div className={classes} {...(jour.nomDuFerie !== null ? { title: jour.nomDuFerie.nom } : {})}>
       {/* Posé en overlay sur la première bande plutôt qu'en ligne à part :
           c'est la correction d'ergonomie ci-dessous — les deux bandes sont
           désormais CONTIGUËS, pleine hauteur, et une ligne de numéro séparée
           rouvrirait l'espace qu'on vient de refermer. */}
       <span className={styles.numero} aria-hidden="true">{Number(jour.date.slice(8, 10))}</span>
+      {/* LE FÉRIÉ SE NOMME DANS SA CASE (22/11). Une bordure en pointillé
+          disait seulement « hors du cadre », comme un week-end : on cherchait
+          pourquoi le rythme n'avait pas rempli ce jeudi. La forme courte au
+          bureau ; au téléphone, une case de 43 px ne tient pas « Armistice »,
+          et elle dit « férié » plutôt que de tronquer — le nom entier est dans
+          la légende, sous la grille, et dans le nom accessible des moitiés. */}
+      {jour.nomDuFerie !== null && (
+        <span className={styles.nomFerie} aria-hidden="true">
+          <span className={styles.ferieLarge}>{jour.nomDuFerie.court}</span>
+          <span className={styles.ferieEtroit}>férié</span>
+        </span>
+      )}
       {jour.creneaux.map((creneau) => (
         <Demi key={creneau.creneau} jour={jour} creneau={creneau} onBasculer={onBasculer} />
       ))}
@@ -308,8 +331,11 @@ function fondBande(occupants: readonly { readonly couleur: string }[]): string |
  */
 function etat(jour: JourDeLaSemaine, creneau: CreneauDuJour): string {
   const noms = creneau.occupants.map((o) => o.nom).join(' et ');
-  if (noms !== '') return noms;
-  if (jour.ferie) return 'jour férié';
+  const ferie = nommerLeFerie(jour);
+  // Une astreinte un jour férié se dit avec le férié : c'est ce qui la rend
+  // remarquable, et l'œil le lit dans la teinte de la case.
+  if (noms !== '') return ferie === null ? noms : `${noms}, ${ferie}`;
+  if (ferie !== null) return ferie;
   if (jour.conge > 0) return 'congé';
   if (jour.weekEnd) return 'week-end';
   return 'libre';

@@ -596,6 +596,25 @@ describe('planning du mois', () => {
     expect(juin.jours.filter((j) => !j.weekEnd && !j.ferie)).toHaveLength(22);
   });
 
+  /**
+   * UN RYTHME NE PLANIFIE PAS UN FÉRIÉ — ET LE JOUR DIT POURQUOI.
+   *
+   * Mai 2026, rythme du lundi au jeudi : le jeudi 14 est l'Ascension. Planifié
+   * d'office, il ferait facturer au CRA une journée chômée que personne n'a
+   * travaillée ; laissé vide sans nom, il ferait chercher l'erreur dans le
+   * rythme. Les deux viennent du même calendrier, au même appel.
+   */
+  it('ne planifie pas un férié, et le nomme', () => {
+    const mai = planningDuMois(avec(), mois('2026-05'));
+    const ascension = mai.jours.find((j) => j.date === '2026-05-14');
+    expect(ascension?.ferie).toBe(true);
+    expect(ascension?.nomDuFerie?.nom).toBe('Ascension');
+    expect(ascension?.retenu).toBe(0);
+    // Le jeudi d'avant, le rythme le remplit : c'est bien le férié qui l'a vidé.
+    expect(mai.jours.find((j) => j.date === '2026-05-07')?.retenu).toBe(1);
+    expect(mai.jours.find((j) => j.date === '2026-05-07')?.nomDuFerie).toBeNull();
+  });
+
   it('reconnaît les week-ends de la semaine sans mission, de la même façon', () => {
     const p = planningDeLaSemaine(avec({ missions: [] }), D('2026-06-10'));
     expect(p.jours.filter((j) => j.weekEnd)).toHaveLength(2);

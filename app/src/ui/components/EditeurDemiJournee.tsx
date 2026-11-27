@@ -122,7 +122,13 @@ export function EditeurDemiJournee(
     <div className={styles.editeur}>
       <p className={styles.jour}>
         {dateCourte(jour.date)}
-        {jour.ferie && <span className={styles.mention}> · jour férié</span>}
+        {/* Le nom, pas seulement la nature : c'est ici qu'on décide de
+            travailler un jour chômé, et « Armistice » dit lequel. */}
+        {jour.ferie && (
+          <span className={styles.mention}>
+            {' · '}{jour.nomDuFerie === null ? 'jour férié' : `férié, ${jour.nomDuFerie.nom}`}
+          </span>
+        )}
         {jour.weekEnd && <span className={styles.mention}> · week-end</span>}
       </p>
 

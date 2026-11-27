@@ -64,7 +64,49 @@
    consommer une nuance de gris. */
 .weekEnd { background: transparent; border-style: dashed; }
 .weekEnd .numero { opacity: 0.6; }
-.ferie { background: transparent; border-style: dashed; }
+
+/* LE FÉRIÉ A SA TEINTE (22/11). Il partageait le pointillé du week-end, et ne
+   s'en distinguait donc pas : deux jours « hors du cadre » de même aspect, dont
+   un seul revient chaque semaine. L'ardoise de `--ferie` n'est ni un client ni
+   l'ambre du congé. Les moitiés libres deviennent transparentes pour laisser
+   voir la teinte ; une moitié travaillée — une astreinte — garde la sienne. */
+.ferie { background: var(--ferie); border-color: color-mix(in srgb, var(--ferie-t) 22%, transparent); }
+.ferie .demi:not(.occupee):not(.conge) { background: transparent; }
+.ferie .numero { color: var(--ferie-t); font-weight: 650; }
+/* Un férié qui est aujourd'hui reste encadré : le cadre dit « tu es ici ». */
+.jourCourant.ferie { border-color: var(--green); }
+
+/* Le nom, en haut à droite, en face du numéro. Deux mots passent sur deux
+   lignes (« 14 / Juillet ») ; un mot ne se coupe jamais. `pointer-events:
+   none` laisse le clic aller à la moitié dessous. */
+.nomFerie {
+  position: absolute;
+  top: 2px;
+  left: 16px;
+  right: 3px;
+  z-index: 1;
+  font-size: 8.5px;
+  font-weight: 650;
+  line-height: 1.1;
+  text-align: right;
+  color: var(--ferie-t);
+  pointer-events: none;
+}
+
+/* LA LARGEUR DE LA CASE DÉCIDE, PAS CELLE DE L'ÉCRAN. La case fait 43 px au
+   téléphone, mais aussi 57 px entre 1 100 et 1 300 px, quand la colonne des
+   chiffres prend sa place à droite : une règle sur la largeur de la fenêtre y
+   aurait laissé « Assomption » déborder et se couper sous `overflow: hidden`.
+   Sous 72 px, la case dit « férié », et la légende donne le nom entier. */
+.ferie { container-type: inline-size; }
+.ferieLarge { display: none; }
+.ferieEtroit { display: inline; }
+
+@container (min-width: 72px) {
+  .nomFerie { font-size: 10px; }
+  .ferieLarge { display: inline; }
+  .ferieEtroit { display: none; }
+}
 
 /* Posé en OVERLAY sur la première bande, et non plus sur sa propre ligne : une
    ligne séparée rouvrirait, en haut de la cellule, l'espace que la bande
@@ -184,6 +226,9 @@
 }
 
 .pastilleConge { background: var(--amber); }
+/* La teinte de la case, cerclée de son texte : l'ardoise pâle seule ne se
+   verrait pas sur la carte en thème clair. */
+.pastilleFerie { background: var(--ferie); box-shadow: inset 0 0 0 1.5px var(--ferie-t); }
 
 /* Les initiales dans la légende : sans elles, « BV » sur la grille n'est qu'un
    code. C'est la légende qui fait d'une abréviation une information. */
