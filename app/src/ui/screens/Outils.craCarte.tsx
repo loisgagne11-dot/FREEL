@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { Mois } from '../../domain/types';
 import { destinatairesDuMois } from '../../state/selecteurs.cra';
 import { useFaits } from '../../state/store';
-import { enJours } from '../documents/DocumentCra';
+import { enJours } from '../documents/modeleCra';
 import { moisLong } from '../format';
 import { Info } from '../components/Info';
 import styles from './Outils.craCarte.module.css';

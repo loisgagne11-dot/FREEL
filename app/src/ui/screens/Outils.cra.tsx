@@ -5,7 +5,8 @@ import { pourDestinataire, syntheseHebdomadaire } from '../../domain/calculs/cra
 import { destinatairesDuMois, journeesDuMois } from '../../state/selecteurs.cra';
 import { useFaits } from '../../state/store';
 import { noterSemaineCra } from '../../state/ecritures.activite';
-import { DocumentCra, enJours, plageDeSemaine } from '../documents/DocumentCra';
+import { DocumentCra } from '../documents/DocumentCra';
+import { enJours, modeleDuCra, plageDeSemaine } from '../documents/modeleCra';
 import { Apercu, useSortieDocument } from '../documents/Apercu';
 import { Sheet } from '../components/Sheet';
 import { moisLong } from '../format';
@@ -146,6 +147,11 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
     return par;
   }, [faits.notesCra, cleNotes]);
 
+  const modele = useMemo(
+    () => modeleDuCra(synthese, faits.entreprise, destinataire, taches),
+    [synthese, faits.entreprise, destinataire, taches]
+  );
+
   const titreFichier = `CRA ${moisLong(m)}${destinataire === null ? '' : ` — ${destinataire}`}`;
 
   const sortir = (action: 'imprimer' | 'telecharger'): void =>
@@ -276,12 +282,7 @@ export function GenerateurCra({ ouvert, onFermer, annee }: ProprietesGenerateurC
         </div>
 
         <Apercu>
-          <DocumentCra
-            synthese={synthese}
-            entreprise={faits.entreprise}
-            destinataire={destinataire}
-            taches={taches}
-          />
+          <DocumentCra modele={modele} />
         </Apercu>
       </div>
     </Sheet>
