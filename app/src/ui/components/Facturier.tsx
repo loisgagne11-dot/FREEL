@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerRelance, encaisserRecette, marquerEnvoyee, supprimerBrouillon } from '../../state/ecritures.recettes';
@@ -42,6 +42,20 @@ import {
 } from '../../domain/calculs/brouillon';
 import styles from './Facturier.module.css';
 import { sousRouteDuBrouillon } from '../adresseBrouillon';
+import { emiseParFreel } from '../../domain/calculs/emission';
+import { type NavigateurPieces, navigateurReel, ouvrirPiece } from '../../infra/justificatifs.ouverture';
+import { PanneauEnvoi } from './Facturier.envoi';
+
+/*
+ * Les factures émises dans un autre logiciel ont leur haut de facturier et leur
+ * formulaire, chacun dans son paquet : avec FREEL, personne ne les télécharge,
+ * et le facturier — déjà l'écran le plus consulté de la fin de mois — n'a pas
+ * à les attendre.
+ */
+const FacturesAEnregistrer = lazy(() => import('./Facturier.externe')
+  .then((m) => ({ default: m.FacturesAEnregistrer })));
+const FormulaireFactureEmise = lazy(() => import('./Facturier.enregistrement')
+  .then((m) => ({ default: m.FormulaireFactureEmise })));
 
 /**
  * Le facturier — toutes les factures, et ce qu'on peut en faire.
@@ -128,9 +142,13 @@ const FILTRES: readonly { readonly id: StatutFacture | 'tout'; readonly libelle:
 ];
 
 const stockageParDefaut = stockageIndexedDB();
+const navigateurParDefaut = navigateurReel();
 
 export function Facturier(
-  { onNouvelle, onRevoir, onReprendre, stockage = stockageParDefaut, annee, mois, onMois }: {
+  {
+    onNouvelle, onRevoir, onReprendre, stockage = stockageParDefaut, annee, mois, onMois,
+    navigateurPieces = navigateurParDefaut
+  }: {
     readonly onNouvelle: () => void;
     /**
      * Rouvre un brouillon enregistré dans la rédaction, par son identifiant
@@ -162,6 +180,8 @@ export function Facturier(
     readonly onRevoir?: (numero: string) => void;
     /** Le stockage des pièces. Injectable pour les tests, comme dans Achats. */
     readonly stockage?: StockageJustificatifs;
+    /** Ce qui ouvre une pièce dans un onglet. Injectable : jsdom n'ouvre pas d'onglet. */
+    readonly navigateurPieces?: NavigateurPieces;
   }
 ) {
   const faits = useFaits((e) => e.faits);
@@ -173,8 +193,16 @@ export function Facturier(
   const [aEncaisser, setAEncaisser] = useState<FactureSuivie<Recette> | null>(null);
   const [aRelancer, setARelancer] = useState<FactureSuivie<Recette> | null>(null);
   const [aJustifier, setAJustifier] = useState<FactureSuivie<Recette> | null>(null);
+  const [aEnvoyer, setAEnvoyer] = useState<FactureSuivie<Recette> | null>(null);
+  const [refusEnvoi, setRefusEnvoi] = useState<string | null>(null);
   const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
+  /** Le formulaire d'une facture émise ailleurs : depuis un brouillon, ou vierge (`null`). */
+  const [aEnregistrer, setAEnregistrer] = useState<{ readonly brouillon: BrouillonDeFacture | null } | null>(null);
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const moisPartage = mois ?? moisLocal;
+  const changerMois = onMois ?? setMoisLocal;
+  const externe = faits.entreprise.emissionFactures === 'externe';
 
   /*
    * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
@@ -208,17 +236,29 @@ export function Facturier(
   }
 
   /**
-   * Marque la facture envoyée, à la date du jour.
+   * Consigne la date d'envoi choisie — la première, ou sa correction.
    *
-   * La date du jour et non un formulaire : on clique en sortant du courriel,
-   * et demander une date à ce moment-là ferait abandonner le geste — après
-   * quoi plus rien ne distinguerait une facture partie d'une facture oubliée.
-   * Le fait qui compte est qu'elle soit partie ; l'antidatage a ses limites,
-   * mais l'absence d'information n'en a aucune.
+   * La date se propose (aujourd'hui) au lieu de s'imposer : voir
+   * `PanneauEnvoi`. Le refus reste dans le panneau, à côté du champ à
+   * corriger, plutôt que dans un message qui disparaît.
    */
-  function envoyer(f: FactureSuivie<Recette>): void {
-    const motif = marquerEnvoyee(f.recette.id, dateDuJour());
-    signaler(motif ?? `Facture ${f.recette.numero || 'sans numéro'} marquée envoyée.`);
+  function envoyer(f: FactureSuivie<Recette>, date: string): void {
+    const correction = f.recette.envoyeeLe != null;
+    const motif = /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? marquerEnvoyee(f.recette.id, dateISO(date))
+      : 'Indique le jour où la facture est partie.';
+    if (motif !== null) { setRefusEnvoi(motif); return; }
+    setAEnvoyer(null);
+    setRefusEnvoi(null);
+    signaler(`Facture ${f.recette.numero || 'sans numéro'} ${correction ? ': date d’envoi corrigée' : 'marquée envoyée'} au ${dateCourte(date)}.`);
+  }
+
+  /*
+   * Ouvre la pièce, depuis le clic même : l'onglet s'ouvre avant toute attente,
+   * sans quoi le navigateur le prendrait pour une fenêtre surgissante.
+   */
+  function ouvrir(idPiece: string): void {
+    void ouvrirPiece(stockage, idPiece, navigateurPieces).then((motif) => { if (motif !== null) signaler(motif); });
   }
 
   function annuler(f: FactureSuivie<Recette>): void {
@@ -241,7 +281,14 @@ export function Facturier(
         onDecaler={(pas) => { setDecalage((d) => d + pas); setLimite(LIGNES_PAR_PAGE); }}
       />
 
-      <BrouillonDuMois {...(mois === undefined ? {} : { mois })} {...(onMois === undefined ? {} : { onMois })} />
+      {externe
+        ? (
+          <Suspense fallback={null}>
+            <FacturesAEnregistrer mois={moisPartage} onMois={changerMois}
+              onEnregistrer={(b) => setAEnregistrer({ brouillon: b })} />
+          </Suspense>
+        )
+        : <BrouillonDuMois mois={moisPartage} onMois={changerMois} />}
 
       <div className={styles.grille}>
         <Chiffre libelle="Reste à rentrer" valeur={eur(etat.resteARentrer)} />
@@ -286,9 +333,21 @@ export function Facturier(
               il retient un numéro.
             </Info>
           </h2>
-          <button type="button" className={styles.actionPrincipale} onClick={onNouvelle}>
-            Nouvelle facture
-          </button>
+          {/* Avec un autre logiciel, FREEL ne rédige pas : le geste de l'en-tête
+              devient celui de recopier une facture émise, sans planning
+              derrière — un acompte, une prestation ponctuelle. */}
+          {externe
+            ? (
+              <button type="button" className={styles.actionPrincipale}
+                onClick={() => setAEnregistrer({ brouillon: null })}>
+                Enregistrer une facture
+              </button>
+            )
+            : (
+              <button type="button" className={styles.actionPrincipale} onClick={onNouvelle}>
+                Nouvelle facture
+              </button>
+            )}
         </header>
 
         <div className={styles.filtres} role="group" aria-label="Filtrer par état">
@@ -316,7 +375,7 @@ export function Facturier(
                même cadre font hésiter sur ce qui les distingue. */
             <Vide
               message={filtre === 'tout'
-                ? 'Aucune facture sur cette période. Émets-en une, ou élargis la période.'
+                ? `Aucune facture sur cette période. ${externe ? 'Enregistre' : 'Émets'}-en une, ou élargis la période.`
                 : 'Aucune facture dans cet état sur cette période.'}
             />
           )
@@ -330,12 +389,15 @@ export function Facturier(
                   onAnnuler={() => annuler(f)}
                   onJeter={() => jeter(f)}
                   onRelancer={() => setARelancer(f)}
-                  onEnvoyer={() => envoyer(f)}
-                  onRevoir={onRevoir === undefined || f.recette.numero === ''
+                  onEnvoyer={() => { setRefusEnvoi(null); setAEnvoyer(f); }}
+                  onRevoir={onRevoir === undefined || f.recette.numero === '' || !emiseParFreel(f.recette)
                     ? undefined
                     : () => onRevoir(f.recette.numero)}
                   onReprendre={onReprendre === undefined ? undefined : () => onReprendre(f.recette.id)}
                   onJustifier={() => setAJustifier(f)}
+                  onOuvrirPiece={f.recette.justificatifId == null
+                    ? undefined
+                    : () => ouvrir(f.recette.justificatifId as string)}
                 />
               ))}
             </ul>
@@ -370,6 +432,33 @@ export function Facturier(
       </Sheet>
 
       <Sheet
+        ouvert={aEnvoyer !== null}
+        titre={aEnvoyer?.recette.envoyeeLe != null ? 'Corriger la date d’envoi' : 'Marquer envoyée'}
+        onFermer={() => { setAEnvoyer(null); setRefusEnvoi(null); }}
+      >
+        {aEnvoyer !== null && (
+          <PanneauEnvoi facture={aEnvoyer} refus={refusEnvoi} onValider={(date) => envoyer(aEnvoyer, date)} />
+        )}
+      </Sheet>
+
+      <Sheet
+        ouvert={aEnregistrer !== null}
+        titre="Enregistrer une facture émise"
+        onFermer={() => setAEnregistrer(null)}
+      >
+        {aEnregistrer !== null && (
+          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+            <FormulaireFactureEmise
+              brouillon={aEnregistrer.brouillon}
+              moisParDefaut={moisPartage}
+              stockage={stockage}
+              onFini={(message) => { setAEnregistrer(null); signaler(message); }}
+            />
+          </Suspense>
+        )}
+      </Sheet>
+
+      <Sheet
         ouvert={aRelancer !== null}
         titre="Relancer"
         onFermer={() => setARelancer(null)}
@@ -393,10 +482,17 @@ export function Facturier(
       >
         {aJustifier !== null && (
           <PanneauJustificatif
-            facture={aJustifier}
+            /* La recette telle qu'elle est MAINTENANT, et non celle du clic :
+               la pièce déposée dans ce panneau s'y rattache, et « Ouvrir la
+               pièce » n'apparaissait qu'après l'avoir refermé puis rouvert. */
+            facture={{
+              ...aJustifier,
+              recette: faits.recettes.find((r) => r.id === aJustifier.recette.id) ?? aJustifier.recette
+            }}
             stockage={stockage}
             onAttacher={(idJustificatif) =>
               attacherJustificatifRecette(aJustifier.recette.id, idJustificatif)}
+            onOuvrir={ouvrir}
           />
         )}
       </Sheet>
@@ -405,7 +501,10 @@ export function Facturier(
 }
 
 function Ligne(
-  { facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer, onJustifier, onRevoir, onReprendre }: {
+  {
+    facture, onEncaisser, onAnnuler, onJeter, onRelancer, onEnvoyer, onJustifier, onRevoir, onReprendre,
+    onOuvrirPiece
+  }: {
     readonly facture: FactureSuivie<Recette>;
     readonly onEncaisser: () => void;
     readonly onAnnuler: () => void;
@@ -416,6 +515,8 @@ function Ligne(
     readonly onRevoir?: (() => void) | undefined;
     readonly onReprendre?: (() => void) | undefined;
     readonly onJustifier: () => void;
+    /** `undefined` quand aucune pièce n'est jointe : rien à ouvrir. */
+    readonly onOuvrirPiece?: (() => void) | undefined;
   }
 ) {
   const { recette: r, statut, echeanceLe, joursDeRetard } = facture;
@@ -435,6 +536,14 @@ function Ligne(
         <span>{r.clientNom || 'Client non renseigné'}</span>
         <span aria-hidden="true">·</span>
         <span>{r.numero || 'Sans numéro'}</span>
+        {/* Dit, parce que c'est ce qui explique l'absence de « Revoir la
+            facture » : son document est celui de l'autre logiciel. */}
+        {!emiseParFreel(r) && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>émise dans ton logiciel</span>
+          </>
+        )}
         {r.emiseLe !== null && (
           <>
             <span aria-hidden="true">·</span>
@@ -491,6 +600,13 @@ function Ligne(
         {(statut === 'emise' || (statut === 'en_retard' && r.envoyeeLe == null)) && (
           <button type="button" className={styles.actionLigne} onClick={onEnvoyer}>
             Marquer envoyée
+          </button>
+        )}
+        {/* Partie, elle se corrige tant qu'elle attend son règlement : c'est la
+            date que relit la relance. Réglée, elle ne sert plus à rien. */}
+        {(statut === 'envoyee' || (statut === 'en_retard' && r.envoyeeLe != null)) && (
+          <button type="button" className={styles.actionSecondaire} onClick={onEnvoyer}>
+            Corriger la date d’envoi
           </button>
         )}
         {(statut === 'emise' || statut === 'envoyee' || statut === 'en_retard') && (
@@ -551,6 +667,13 @@ function Ligne(
         {/* Disponible quel que soit le statut : une facture reprise de
             l'ancienne version ou établie hors de l'application peut arriver
             dans n'importe quel état, brouillon compris. */}
+        {/* La pièce se LIT d'ici, sans passer par son panneau : pour une
+            facture de Tiime, c'est le seul document que FREEL en garde. */}
+        {onOuvrirPiece !== undefined && (
+          <button type="button" className={styles.actionLigne} onClick={onOuvrirPiece}>
+            Ouvrir la pièce
+          </button>
+        )}
         <button type="button" className={styles.actionSecondaire} onClick={onJustifier}>
           {r.justificatifId != null ? 'Pièce jointe' : 'Joindre une pièce'}
         </button>
@@ -611,10 +734,11 @@ type RetourJustificatif = { readonly ton: 'succes' | 'echec'; readonly texte: st
  * probant, seule la nature du fait change.
  */
 function PanneauJustificatif(
-  { facture, stockage, onAttacher }: {
+  { facture, stockage, onAttacher, onOuvrir }: {
     readonly facture: FactureSuivie<Recette>;
     readonly stockage: StockageJustificatifs;
     readonly onAttacher: (idJustificatif: string | null) => void;
+    readonly onOuvrir: (idJustificatif: string) => void;
   }
 ) {
   const { recette } = facture;
@@ -675,16 +799,31 @@ function PanneauJustificatif(
         {recette.numero || 'Sans numéro'} — {recette.clientNom || 'client non renseigné'}
       </p>
 
+      {/* Les deux cas ne disent pas la même chose : une facture de FREEL se
+          reconstruit, une facture de Tiime n'existe ici que par sa pièce. Le
+          même texte pour les deux laisserait croire la seconde facultative au
+          même titre. */}
       <p className={styles.aide}>
-        Une facture émise dans l’application n’a besoin d’aucune pièce
-        jointe&nbsp;: elle se reconstruit depuis les faits. Cette pièce sert
-        aux factures établies AILLEURS, ou reprises de l’ancienne version — la
-        joindre est ce qui leur donne une valeur probante en contrôle.
+        {emiseParFreel(recette)
+          ? <>Une facture émise dans l’application n’a besoin d’aucune pièce
+            jointe&nbsp;: elle se reconstruit depuis les faits. Cette pièce sert
+            aux factures établies AILLEURS, ou reprises de l’ancienne version — la
+            joindre est ce qui leur donne une valeur probante en contrôle.</>
+          : <>Cette facture a été émise dans ton logiciel&nbsp;: FREEL n’en a pas le
+            document, et sa pièce est la seule copie qu’il en garde. La joindre est
+            ce qui lui donne une valeur probante en contrôle.</>}
       </p>
 
       {justificatifId === null
         ? <p className={styles.verdict}>Aucune pièce conservée.</p>
         : <p className={styles.verdictAccent}>Une pièce est conservée.</p>}
+      {/* Une phrase, pas un mur : la pièce n'existe que dans ce navigateur
+          tant que les justificatifs ne suivent pas le compte (lot 40). Un
+          autre appareil relié verra la facture, pas son PDF. */}
+      <p className={styles.aide}>
+        Elle vit sur cet appareil&nbsp;: les pièces ne suivent pas encore ton
+        compte — l’archive complète, dans Réglages › Données, les emporte.
+      </p>
 
       <label className={styles.champFichier} htmlFor={`${idChamp}-fichier`}>
         {justificatifId === null ? 'Déposer une pièce' : 'Remplacer la pièce'}
@@ -702,9 +841,13 @@ function PanneauJustificatif(
 
       {justificatifId !== null && (
         <div className={styles.ligneActions}>
+          <button type="button" className={styles.actionLigne} disabled={enCours}
+            onClick={() => onOuvrir(justificatifId)}>
+            Ouvrir la pièce
+          </button>
           <button
             type="button"
-            className={styles.actionLigne}
+            className={styles.actionSecondaire}
             disabled={enCours}
             onClick={() => void verifier()}
           >
@@ -1006,7 +1149,7 @@ function PanneauRelance(
  * pourquoi c'est un bouton, et le seul de cette carte.
  */
 function BrouillonDuMois(
-  { mois: moisChoisi, onMois }: { readonly mois?: Mois; readonly onMois?: (m: Mois) => void }
+  { mois, onMois: setMois }: { readonly mois: Mois; readonly onMois: (m: Mois) => void }
 ) {
   const faits = useFaits((e) => e.faits);
   const signaler = useToast();
@@ -1018,11 +1161,10 @@ function BrouillonDuMois(
    * portait alors la barre du haut : on pouvait regarder mai en haut et la
    * facture de juin en bas, sans que rien ne le signale. Ses flèches déplacent
    * désormais le mois de l'application — elles restent là parce que c'est ici
-   * qu'on cherche la facture du mois précédent, le jour où on l'émet.
+   * qu'on cherche la facture du mois précédent, le jour où on l'émet. Le repli
+   * sur un mois local, pour un facturier monté seul, vit dans le facturier :
+   * le haut des factures émises ailleurs lit le même.
    */
-  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
-  const mois = moisChoisi ?? moisLocal;
-  const setMois = onMois ?? setMoisLocal;
   const brouillons = useMemo(() => brouillonsDeFacture(faits, mois), [faits, mois]);
   const enFranchise = emetteurDe(faits).enFranchise;
 

@@ -198,6 +198,20 @@ export interface EntreeATraiter {
     readonly echeance: DateISO;
     readonly jours: number;
   }[];
+  /**
+   * Les mois travaillés sans facture enregistrée, quand les factures s'émettent
+   * dans un autre logiciel (22/11) : un par mois, le plus ancien d'abord, déjà
+   * filtrés par `moisAEnregistrer` — ce module ne refait pas la règle.
+   */
+  readonly facturesAEnregistrer?: readonly {
+    readonly mois: Mois;
+    /** Combien de payeurs attendent leur facture ce mois-là. */
+    readonly payeurs: number;
+    /** Le montant hors taxes que le planning leur compte. */
+    readonly montant: Euros;
+    /** Le payeur, quand il est seul : « Atelier Novak » se lit mieux que « 1 client ». */
+    readonly client: string | null;
+  }[];
 }
 
 export interface SeuilsAlerte {
@@ -475,6 +489,23 @@ export function sujetsATraiter(
       gravite: 'a_faire',
       nombre: 1,
       donnees: { missionId: f.missionId, mission: f.nom, echeance: f.echeance, jours: f.jours }
+    });
+  }
+
+  /* ---------- factures émises ailleurs, à enregistrer ---------- */
+  //
+  // Un sujet par MOIS, et non un seul pour tous : chacun se règle d'un geste
+  // distinct — retrouver la facture dans Tiime, recopier son numéro, joindre
+  // son PDF —, et « 4 factures à enregistrer » ne dirait pas lesquelles. À
+  // faire, pas en retard : la facture est peut-être émise depuis longtemps ;
+  // c'est FREEL qui ne la connaît pas encore.
+  for (const f of e.facturesAEnregistrer ?? []) {
+    sujets.push({
+      id: `facture-a-enregistrer-${f.mois}`,
+      ecran: 'factures',
+      gravite: 'a_faire',
+      nombre: f.payeurs,
+      donnees: { mois: f.mois, montant: f.montant, client: f.client }
     });
   }
 

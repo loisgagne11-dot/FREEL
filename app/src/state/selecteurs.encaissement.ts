@@ -14,6 +14,10 @@ import type { Faits } from './schema';
 export function dernierModeDeReglement(faits: Faits, clientNom: string): ModeReglement {
   let dernier: { readonly le: string; readonly mode: ModeReglement } | null = null;
   for (const r of faits.recettes) {
+    // Exiger le mode est VOULU, et ne touche qu'à la proposition : une recette
+    // encaissée sans mode (reprise de l'ancienne version) ne dit rien de la
+    // façon dont ce client paie. Elle reste encaissée — le statut se lit sur
+    // la date —, et son manque est un sujet « à compléter » du livre.
     if (r.clientNom !== clientNom || r.encaisseeLe === null || r.modeReglement === null) continue;
     // Une écriture d'annulation recopie le mode de la facture qu'elle annule :
     // elle ne dit rien de la façon dont le client paie.

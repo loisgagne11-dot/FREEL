@@ -31,6 +31,7 @@
 
 import { type DateISO, type Euros, euros } from '../types';
 import { SEUIL_GLOBALISATION_DETAIL } from '../bareme/recettes';
+import { type ModeEmission, emiseParFreel } from './emission';
 
 export type ModeReglement = 'virement' | 'cheque' | 'especes' | 'carte' | 'autre';
 
@@ -60,6 +61,11 @@ export interface EcritureRecette {
   readonly tvaCollectee?: Euros | null;
   /** Recette globalisée en fin de journée, sans identité de client. */
   readonly globalisee?: boolean;
+  /**
+   * Le logiciel qui a numéroté la pièce (schéma 29). Voir `emiseParFreel` :
+   * la suite d'un autre logiciel n'est pas celle de FREEL.
+   */
+  readonly emisePar?: ModeEmission;
 }
 
 export type NatureEcart =
@@ -173,6 +179,13 @@ function reference(e: EcritureRecette): string {
  * que l'application produit. Un numéro d'une autre forme n'est pas une erreur :
  * il peut venir d'un logiciel antérieur, et le déclarer fautif ferait crier au
  * loup sur tout un historique repris.
+ *
+ * Une facture émise dans un autre logiciel n'entre pas dans la suite, même à
+ * cette forme : sa numérotation est celle de ce logiciel, qui en répond. Si
+ * Tiime numérote « 2026-012 » et que FREEL a émis jusqu'à 2026-005, la suite
+ * annoncerait six numéros manquants qu'aucune facture de FREEL n'a jamais
+ * portés. Le doublon, lui, reste contrôlé sur tout le livre : une pièce, une
+ * écriture, d'où qu'elle vienne.
  */
 function ecartsDeNumerotation(
   recettes: readonly EcritureRecette[]
@@ -197,7 +210,7 @@ function ecartsDeNumerotation(
       vus.set(numero, e.id);
     }
 
-    const correspond = /^(\d{4})-(\d+)$/.exec(numero);
+    const correspond = emiseParFreel(e) ? /^(\d{4})-(\d+)$/.exec(numero) : null;
     if (correspond === null) continue;
     const annee = correspond[1] as string;
     const rang = Number(correspond[2]);

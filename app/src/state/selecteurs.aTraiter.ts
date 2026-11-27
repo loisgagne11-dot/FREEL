@@ -28,6 +28,7 @@ import type { Faits, Recette } from './schema';
 import { montantDeclaration, obligationsEntre, preneursDeServices } from './selecteurs.obligations';
 import { FORMULE_PAR_DEFAUT, echeanceDe } from '../domain/calculs/delaiPaiement';
 import { finAnnoncee } from '../domain/calculs/carnetDeCommandes.echeance';
+import { moisAEnregistrer } from './selecteurs.brouillon';
 
 // Servi ici pour que le rail le calcule avec les sujets, dans le même paquet différé.
 export { compteursParEcran };
@@ -92,8 +93,32 @@ export function entreeATraiter(
     ...sujetsDesObligations(faits, obligations, aujourdhui),
     tvaDueDepuis: tvaDue,
     facturesSansTva: tvaDue === null ? 0 : facturesEmisesSansTva(faits, tvaDue),
-    finsAnnoncees: finsAnnonceesDe(faits, aujourdhui)
+    finsAnnoncees: finsAnnonceesDe(faits, aujourdhui),
+    facturesAEnregistrer: faits.entreprise.emissionFactures === 'externe'
+      ? facturesAEnregistrerDe(faits, maintenant)
+      : []
   };
+}
+
+/**
+ * Les mois à enregistrer, réunis par mois : la liste du facturier
+ * (`moisAEnregistrer`), et une seule. Avec FREEL, rien : chaque brouillon du
+ * mois propose déjà « Émettre », et ce sujet doublerait le geste.
+ */
+function facturesAEnregistrerDe(faits: Faits, maintenant: Date): NonNullable<EntreeATraiter['facturesAEnregistrer']> {
+  const parMois = new Map<Mois, { payeurs: Set<string>; montant: number }>();
+  for (const b of moisAEnregistrer(faits, maintenant)) {
+    const m = parMois.get(b.mois) ?? { payeurs: new Set<string>(), montant: 0 };
+    m.payeurs.add(b.clientNom);
+    m.montant += b.total;
+    parMois.set(b.mois, m);
+  }
+  return [...parMois].map(([mois, { payeurs, montant }]) => ({
+    mois,
+    payeurs: payeurs.size,
+    montant: euros(montant),
+    client: payeurs.size === 1 ? [...payeurs][0] ?? null : null
+  }));
 }
 
 /**

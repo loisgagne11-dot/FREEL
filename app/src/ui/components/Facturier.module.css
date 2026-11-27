@@ -494,3 +494,36 @@ a.actionLigne:focus-visible {
   color: var(--muted);
   max-width: 100%;
 }
+
+/* ── Factures émises ailleurs : l'envoi, en trois positions ──────────────
+   Trois boutons radio et non une case « envoyée le même jour » : « pas
+   encore » est une réponse à part entière — la facture partira plus tard, et
+   « Marquer envoyée » l'attend dans la liste. */
+
+.choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.choix legend { flex-basis: 100%; margin-bottom: 4px; padding: 0; }
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* Les volets d'une facture émise ailleurs et de la date d'envoi empilent des
+   paragraphes : leurs marges s'ajoutaient à l'écart du panneau, et la capture
+   montrait des champs séparés de près de cinquante pixels — un formulaire
+   qu'on lit comme une suite de blocs sans rapport. */
+.saisieFacture p { margin: 0; }

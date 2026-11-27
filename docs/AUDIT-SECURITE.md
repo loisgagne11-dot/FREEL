@@ -57,7 +57,7 @@ l'ancienne `index.html` pour ses liaisons externes. `npm audit` lancé le 13/11.
 | Écrasement entre appareils | Verrou de version vérifié par le serveur dans la requête | `pousserFaits` |
 | Effacement | Prouvé par relecture, jamais annoncé sur la foi d'un « succès » | `effacerLigne` (lot 25) |
 | Sorties | CSV neutralisé contre les formules ; titre de document échappé ; aucun `dangerouslySetInnerHTML` ; PDF du compte rendu (27/11) : chaînes échappées (`(`, `)`, `\`), octets hauts en octal, titre en UTF-16, ni JavaScript ni formulaire ni action — joué au corpus hostile | `livreRecettesCsv.ts`, `telechargement.ts`, `pdf.ts` |
-| Pièces | Taille bornée, types listés (pas de SVG), empreinte SHA-256, jamais envoyées au compte | `infra/justificatifs.ts` |
+| Pièces | Taille bornée, types listés (pas de SVG), empreinte SHA-256, jamais envoyées au compte ; contrôlées avant d'écrire la facture qu'elles justifient (`motifRefusFichier`). Ouvertes (27/11) dans un onglet coupé de FREEL (`opener` nul), par une adresse `blob:` révoquée à sa fermeture, **sous un type de la liste reposé sur une copie** : une adresse `blob:` a l'origine de FREEL, et une pièce `text/html` y lirait le dossier — elle ne s'ouvre pas | `infra/justificatifs.ts`, `justificatifs.ouverture.ts` et son test |
 | Perte locale | Copie avant restauration, deux onglets, quota plein | lot 1 |
 | Confidentialité du dépôt | Balayage des formes (SIRET, IBAN, courriel) | `tests/smoke-test.js` |
 

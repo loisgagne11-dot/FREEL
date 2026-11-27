@@ -563,3 +563,31 @@ describe('la rédaction reprise d’un brouillon', () => {
     expect(screen.getByText(/n’existe plus/)).toBeTruthy();
   });
 });
+
+/**
+ * « NOUVEAU › FACTURE » QUAND LES FACTURES S'ÉMETTENT AILLEURS (22/11).
+ *
+ * Le menu et l'action rapide du Pilote mènent ici quel que soit le mode.
+ * Rédiger d'office ferait naître une seconde numérotation au premier clic, à
+ * côté de celle de Tiime : la rédaction le dit d'abord, et le choix reste.
+ */
+describe('avec un autre logiciel de facturation', () => {
+  const externe = () => semer({ entreprise: { ...ENTREPRISE, emissionFactures: 'externe' }, clients: [client()] });
+
+  it('dit où la facture s’émet avant de proposer de la rédiger', () => {
+    externe();
+    window.location.hash = '#/facture/nouvelle';
+    render(<Facture />);
+    expect(screen.getByText(/Tes factures s’émettent dans ton logiciel de facturation/)).toBeTruthy();
+    expect(screen.queryByLabelText('Client')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Aller à Factures' })).toBeTruthy();
+  });
+
+  it('laisse rédiger quand même, en disant le numéro que la facture prendra', async () => {
+    externe();
+    window.location.hash = '#/facture/nouvelle';
+    render(<Facture />);
+    await userEvent.setup().click(screen.getByRole('button', { name: /Rédiger quand même avec FREEL — elle prendra un numéro de FREEL/ }));
+    expect(await screen.findByLabelText('Client')).toBeTruthy();
+  });
+});

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
 import { etatFacture, reediterFacture } from '../../state/selecteurs.facture';
@@ -42,6 +42,8 @@ export function Facture() {
    * au facturier, ce qu'un état local ne savait pas faire.
    */
   const { sousRoute, naviguerVers } = useRoute();
+  const externe = useFaits((e) => e.faits.entreprise.emissionFactures === 'externe');
+  const [redigerQuandMeme, setRedigerQuandMeme] = useState(false);
 
   /* `#/facture/brouillon:<mois>:<client>` ouvre la même rédaction, préremplie
      depuis le brouillon du mois : voir `adresseBrouillon`. La clé force un
@@ -50,6 +52,13 @@ export function Facture() {
   // `#/facture/reprendre:<id>` rouvre un brouillon ENREGISTRÉ (lot 29).
   const enregistre = sousRoute === null ? null : brouillonEnregistreDeLaSousRoute(sousRoute);
   if (sousRoute === 'nouvelle' || brouillon !== null || enregistre !== null) {
+    /* « Nouveau › Facture » et l'action rapide du Pilote mènent ici quel que
+       soit le mode. Avec un autre logiciel, rédiger d'office ferait naître une
+       seconde numérotation au premier clic : on le dit, et le choix reste. Un
+       brouillon déjà gardé se reprend sans détour — il est de FREEL. */
+    if (externe && !redigerQuandMeme && enregistre === null) {
+      return <EmiseAilleurs onListe={() => naviguerVers('factures')} onRediger={() => setRedigerQuandMeme(true)} />;
+    }
     return (
       <Suspense fallback={<EnAttente />}>
         <NouvelleFacture
@@ -80,6 +89,35 @@ export function Facture() {
   }
 
   return <VersLesFactures />;
+}
+
+/** Ce que la rédaction dit quand les factures s'émettent dans un autre logiciel. */
+function EmiseAilleurs(
+  { onListe, onRediger }: { readonly onListe: () => void; readonly onRediger: () => void }
+) {
+  return (
+    <>
+      <header className={styles.entete}>
+        <h1 className={styles.titre}>Nouvelle facture</h1>
+      </header>
+      <p className={styles.bandeau} role="status">
+        Tes factures s’émettent dans ton logiciel de facturation (Réglages ›
+        Facturation). Émets-la là-bas, puis enregistre-la dans Factures avec son
+        numéro et son PDF&nbsp;: FREEL ne lui donne pas de second numéro.
+      </p>
+      <div className={styles.actions}>
+        <button type="button" className={styles.actionPrincipale} onClick={onListe}>
+          Aller à Factures
+        </button>
+        {/* Le choix reste (22/11) : « générer la facture, ou juste suivre ».
+            Mais la facture rédigée ici prendra un numéro de FREEL, à côté de
+            ceux de l'autre logiciel — dit avant le clic, pas après. */}
+        <button type="button" className={styles.action} onClick={onRediger}>
+          Rédiger quand même avec FREEL — elle prendra un numéro de FREEL
+        </button>
+      </div>
+    </>
+  );
 }
 
 /**

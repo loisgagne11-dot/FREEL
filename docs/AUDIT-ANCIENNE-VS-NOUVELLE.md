@@ -818,3 +818,21 @@ clic, et le PDF lit le **même modèle** que l'aperçu.
 | Le téléchargement HTML autonome du CRA | 🚫 retiré | Il ne s'ouvrait proprement que dans un navigateur ; le PDF le remplace. « Imprimer » reste |
 | Le PDF de la facture | 🟢 inchangé | La facture garde « Imprimer → Enregistrer en PDF » et son téléchargement HTML (`downloadInvoiceAsHTML` plus haut) : hors de ce lot, la « facture en PDF » est rangée dans la liste de sortie |
 
+
+## 27/11 — Les factures tenues dans un autre logiciel (demandé le 22/11)
+
+« Avoir le choix de générer la facture ou de juste suivre les factures et
+joindre la facture en pièce jointe. » L'ancienne ne connaissait que ses
+propres factures ; ce choix n'existe dans aucune des deux versions avant ce
+lot.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Choisir l'outil d'émission | 🆕 | Réglages › Facturation : FREEL / un autre logiciel. Un fait (`emissionFactures`, schéma 29), FREEL par défaut ; refusé à l'import s'il n'est pas l'un des deux |
+| Enregistrer une facture émise ailleurs | 🆕 | Numéro du logiciel (exigé, unique parmi les recettes, sans la casse), dates d'émission et d'envoi, échéance, mois couvert, montant du planning, PDF. Aucun numéro de FREEL n'est pris ; la facture porte `emisePar: 'externe'` et entre au suivi, au livre et aux relances comme une autre |
+| Les mois travaillés sans facture | 🆕 | Liste et sujets « À faire », un par mois ; la reprise de l'ancienne version reprend désormais son `mois` de facture (`moisFacture`), qu'elle perdait — sans lui, juillet facturé le 2 août paraîtrait encore à enregistrer |
+| Rattacher une facture au mois qu'elle couvre | 🆕 | Pour une facture d'avant le schéma 29, qui ne le disait pas : un geste dans la ligne du mois en attente |
+| Rééditer une facture | 🟢 | « Revoir la facture » et `#/facture/<numéro>` refusés pour une facture émise ailleurs : FREEL n'en a pas le document |
+| `setFactureStatus(…, 'envoyée')` — qui posait `dateEnvoi` au jour du clic | 🟢 | La date se propose (aujourd'hui) et se corrige ensuite ; un envoi à venir ou avant l'émission est refusé |
+| Ouvrir la pièce d'une facture | 🆕 | N'existait nulle part : la pièce se déposait et se vérifiait, ne se lisait pas. Nouvel onglet, adresse locale révoquée à sa fermeture, type forcé à ceux du dépôt (une pièce `text/html` ne s'ouvre pas) |
+| Numérotation continue au livre | 🟢 | Les numéros d'un autre logiciel ne comptent plus dans la suite de FREEL (ils y créaient des trous imaginaires) ; les doublons restent contrôlés partout |

@@ -228,6 +228,21 @@ describe('livre des recettes', () => {
     const e = entree({ recettes: [recette({ encaisseeLe: null, modeReglement: null })] });
     expect(idsDe(e)).not.toContain('livre-recettes-incomplet');
   });
+
+  /*
+   * À COMPLÉTER, PAS EN RETARD (22/11). Une recette reprise de l'ancienne
+   * version sans son mode a été PAYÉE : la compter en retard ferait relancer
+   * un client qui a réglé, et rougir le Pilote pour une mention manquante.
+   */
+  it('un mode manquant est une mention à compléter, ni un retard ni un impayé', () => {
+    const e = entree({
+      recettes: [recette({ emiseLe: dateISO('2026-04-01'), echeanceLe: dateISO('2026-05-01'),
+        encaisseeLe: dateISO('2026-06-10'), modeReglement: null })]
+    });
+    const s = sujetsATraiter(e).find((x) => x.id === 'livre-recettes-incomplet');
+    expect(s?.gravite).toBe('a_faire');
+    expect(idsDe(e)).not.toContain('factures-en-retard');
+  });
 });
 
 describe('échéances réglementaires', () => {

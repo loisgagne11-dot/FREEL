@@ -678,6 +678,32 @@ function partGardeeDuSchema27(part: unknown, dejaRetiree: unknown): number | nul
 }
 
 /**
+ * v28 → v29 : la provenance de chaque facture, et le mois qu'elle couvre.
+ *
+ * Deux champs d'un ÉLÉMENT de liste : la fusion de surface ne les atteint pas,
+ * d'où cette fonction. Toute facture d'avant a été produite par FREEL — c'est
+ * la seule chose que l'application savait faire —, et le mois qu'elle couvre
+ * n'a jamais été dit : `null`, jamais le mois de son émission recopié, qui
+ * ferait passer une supposition (la facture d'août émise le 2 septembre
+ * couvrirait septembre) pour un fait que la saisie n'a pas donné. Le repli
+ * sur la date d'émission se fait à la lecture, où il se dit repli
+ * (`moisFactureDe`).
+ *
+ * Une valeur illisible — un fichier fabriqué — redevient le défaut plutôt que
+ * de voyager : `schema.exterieur` l'aurait refusée à l'entrée, et un dossier
+ * local ne contient que ce que l'application a écrit.
+ */
+function recettesDuSchema28(recettes: readonly Recette[]): readonly Recette[] {
+  return recettes.map((r) => ({
+    ...r,
+    emisePar: r.emisePar === 'externe' ? 'externe' : 'freel',
+    moisFacture: typeof r.moisFacture === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/u.test(r.moisFacture)
+      ? r.moisFacture
+      : null
+  }));
+}
+
+/**
  * Complète un bloc validé avec les valeurs par défaut des champs absents, et
  * CONVERTIT les formats des schémas antérieurs.
  *
@@ -780,6 +806,11 @@ function partGardeeDuSchema27(part: unknown, dejaRetiree: unknown): number | nul
  *
  * v27 → v28 : la part gardée se fond dans la réserve (décision 24) — voir
  * `partGardeeDuSchema27`.
+ *
+ * v28 → v29 : les factures émises ailleurs. `emissionFactures` est un champ du
+ * profil, comblé à `freel` — ce que faisait tout dossier d'avant, et rien
+ * d'autre qu'un des deux modes ne passe. `emisePar` et `moisFacture` vivent
+ * dans chaque recette : voir `recettesDuSchema28`.
  */
 export function completerFaits(brut: unknown): Faits {
   const { partGardeeAuVersement: partGardee, ...o } = brut as Record<string, unknown>;
@@ -798,7 +829,8 @@ export function completerFaits(brut: unknown): Faits {
     entreprise: {
       ...entrepriseVide(),
       ...entreprise,
-      partGardeeRetiree: partGardeeDuSchema27(partGardee, entreprise.partGardeeRetiree)
+      partGardeeRetiree: partGardeeDuSchema27(partGardee, entreprise.partGardeeRetiree),
+      emissionFactures: entreprise.emissionFactures === 'externe' ? 'externe' : 'freel'
     },
     conges: congesDuSchema1(o['conges']),
     clients: clientsDuSchema12(o['clients']),
@@ -814,8 +846,8 @@ export function completerFaits(brut: unknown): Faits {
       (entreprise as { urssafPeriodicite?: unknown }).urssafPeriodicite === 'trimestriel' ? 'trimestriel' : 'mensuel'
     ),
     periodesDeclarees: periodesDeclareesDuSchema24(o['periodesDeclarees']),
-    recettes: recettesDuSchema19(recettesDuSchema15(
+    recettes: recettesDuSchema28(recettesDuSchema19(recettesDuSchema15(
       recettesDuSchema12(recettesDuSchema6(o['recettes']), o['clients'])
-    ))
+    )))
   } as Faits;
 }

@@ -1221,6 +1221,38 @@ describe('navigation entre les sections', () => {
     expect(screen.getByText(/pénalités sont dues/)).toBeTruthy();
   });
 
+  /*
+   * LE CHOIX DU PROPRIÉTAIRE (22/11) : « générer la facture, ou juste suivre
+   * les factures et joindre la facture en pièce jointe ». S'il ne s'écrivait
+   * pas, le facturier continuerait de proposer « Rédiger » à qui émet dans
+   * Tiime — et la seconde numérotation qu'on cherche à éviter naîtrait au
+   * premier clic.
+   */
+  it('Facturation : le choix de l’outil d’émission s’écrit au profil, FREEL par défaut', async () => {
+    await afficher('facturation');
+    const groupe = screen.getByRole('radiogroup', { name: 'Tu émets tes factures avec' });
+    expect(within(groupe).getByRole('radio', { name: 'FREEL' }).getAttribute('aria-checked')).toBe('true');
+
+    await utilisateurTest().click(within(groupe).getByRole('radio', { name: 'Un autre logiciel' }));
+
+    expect(useFaits.getState().faits.entreprise.emissionFactures).toBe('externe');
+    expect(within(groupe).getByRole('radio', { name: 'Un autre logiciel' }).getAttribute('aria-checked')).toBe('true');
+    // L'aide dit à qui revient désormais la conformité.
+    expect(screen.getByText(/La numérotation et la conformité .* relèvent alors de ce logiciel/)).toBeTruthy();
+  });
+
+  /* Avec un autre logiciel, les mentions de FREEL ne sont plus celles des
+     factures : les afficher laisserait croire que FREEL les garantit. */
+  it('Facturation : avec un autre logiciel, ni les mentions ni la numérotation de FREEL', async () => {
+    useFaits.setState({
+      faits: { ...faitsVides(), entreprise: { ...faitsVides().entreprise, emissionFactures: 'externe' } }
+    });
+    await afficher('facturation');
+    expect(screen.queryByText(/Mentions portées sur chaque facture/)).toBeNull();
+    expect(screen.queryByText(/numérotation des factures est automatique/)).toBeNull();
+    expect(screen.getByText(/FREEL ne lui attribue aucun numéro/)).toBeTruthy();
+  });
+
   it('Données : l’export et la restauration', async () => {
     await afficher('donnees');
     expect(screen.getByRole('button', { name: 'Créer l’archive complète (ZIP)' })).toBeTruthy();

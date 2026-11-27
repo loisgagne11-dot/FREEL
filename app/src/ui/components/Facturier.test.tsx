@@ -761,16 +761,81 @@ describe('cycle de vie : envoyée, avec sa date', () => {
     expect(screen.getByRole('button', { name: 'Marquer envoyée' })).toBeTruthy();
   });
 
-  it('consigne la date d’envoi et change l’état', async () => {
+  /*
+   * Le geste écrivait la date du jour sans rien demander : la facture partie
+   * vendredi depuis Tiime se retrouvait datée de lundi, et c'est cette date
+   * que relit la relance. Le propriétaire veut la date PROPOSÉE (22/11) :
+   * aujourd'hui par défaut, un clic de plus pour le cas courant.
+   */
+  it('consigne la date d’envoi proposée — aujourd’hui — et change l’état', async () => {
     semer([recette({ id: 'r1' })]);
     rendre();
     const utilisateur = userEvent.setup();
 
     await utilisateur.click(screen.getByRole('button', { name: 'Marquer envoyée' }));
+    const volet = screen.getByRole('dialog', { name: 'Marquer envoyée' });
+    expect((within(volet).getByLabelText('Date d’envoi') as HTMLInputElement).value).toBe('2026-08-13');
+    await utilisateur.click(within(volet).getByRole('button', { name: 'Confirmer l’envoi' }));
 
     expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBe('2026-08-13');
     expect(screen.getByText('Envoyée')).toBeTruthy();
     expect(screen.getByText(/envoyée le/)).toBeTruthy();
+  });
+
+  it('consigne une autre date, quand la facture est partie avant', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Marquer envoyée' }));
+    const champ = within(screen.getByRole('dialog')).getByLabelText('Date d’envoi');
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '2026-08-07');
+    await utilisateur.click(screen.getByRole('button', { name: 'Confirmer l’envoi' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBe('2026-08-07');
+  });
+
+  /*
+   * LA DATE D'ENVOI SE CORRIGE. Elle n'est imprimée sur aucun document, au
+   * contraire de la date d'émission : une erreur de saisie n'a pas à être
+   * gravée, et c'est elle qu'on oppose à « je ne l'ai jamais reçue ».
+   */
+  it('corrige après coup la date d’une facture déjà partie', async () => {
+    semer([recette({ id: 'r1', envoyeeLe: dateISO('2026-08-12') })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Corriger la date d’envoi' }));
+    const volet = screen.getByRole('dialog', { name: 'Corriger la date d’envoi' });
+    const champ = within(volet).getByLabelText('Date d’envoi') as HTMLInputElement;
+    expect(champ.value).toBe('2026-08-12');
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '2026-08-03');
+    await utilisateur.click(within(volet).getByRole('button', { name: 'Corriger la date d’envoi' }));
+
+    expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBe('2026-08-03');
+  });
+
+  /* Un envoi daté de demain ferait courir la relance d'une facture qui n'est
+     pas partie ; daté d'avant l'émission, d'une facture qui n'existait pas. */
+  it('refuse une date à venir, et une date avant l’émission, en le disant dans le panneau', async () => {
+    semer([recette({ id: 'r1' })]);
+    rendre();
+    const utilisateur = userEvent.setup();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Marquer envoyée' }));
+    const champ = within(screen.getByRole('dialog')).getByLabelText('Date d’envoi');
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '2026-08-20');
+    await utilisateur.click(screen.getByRole('button', { name: 'Confirmer l’envoi' }));
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toMatch(/pas encore arrivée/);
+
+    await utilisateur.clear(champ);
+    await utilisateur.type(champ, '2026-07-20');
+    await utilisateur.click(screen.getByRole('button', { name: 'Confirmer l’envoi' }));
+    expect(within(screen.getByRole('dialog')).getByRole('alert').textContent).toMatch(/avant d’exister/);
+    expect(useFaits.getState().faits.recettes[0]?.envoyeeLe).toBeUndefined();
   });
 
   /** Le geste ne se propose qu'une fois : elle est partie, elle reste partie. */
@@ -849,6 +914,9 @@ describe('pièce jointe d’une recette', () => {
     const [piece] = [...stockage.contenu.values()];
     expect(piece?.fait).toEqual({ nature: 'recette', id: 'r1' });
     await screen.findByText(/Pièce conservée : facture-vente\.pdf/);
+    // Le panneau suit la recette : la pièce qu'on vient d'y déposer s'ouvre
+    // aussitôt, sans le refermer d'abord.
+    expect(await within(screen.getByRole('dialog')).findByRole('button', { name: 'Ouvrir la pièce' })).toBeTruthy();
   });
 
   // Une facture émise par l'application n'a besoin d'aucune pièce : le
@@ -876,6 +944,64 @@ describe('pièce jointe d’une recette', () => {
 
     expect(useFaits.getState().faits.recettes[0]?.justificatifId).toBeNull();
   });
+
+  /*
+   * « OUVRIR LA PIÈCE » (22/11). Une pièce se déposait, se vérifiait, se
+   * détachait — et ne se lisait pas. Pour une facture de Tiime, c'est le seul
+   * document que FREEL en garde : le client qui dit ne pas l'avoir reçue
+   * attendait qu'on la retrouve ailleurs.
+   */
+  it('ouvre la pièce d’une facture, depuis la liste comme depuis son panneau', async () => {
+    const stockage = stockageMemoireJustificatifs();
+    await stockage.deposer({
+      id: 'p1', nomFichier: 'facture.pdf', typeMime: 'application/pdf', taille: 9,
+      empreinte: 'e', deposeLe: '2026-08-01T09:00:00.000Z', fait: { nature: 'recette', id: 'r1' },
+      contenu: new Blob(['%PDF-1.4'], { type: 'application/pdf' })
+    });
+    semer([recette({ id: 'r1', justificatifId: 'p1' }), recette({ id: 'r2', numero: '2026-002' })]);
+    const adresses: string[] = [];
+    const onglet = { opener: {} as unknown, closed: false, location: { href: '' }, close: () => undefined };
+    render(
+      <FournisseurToasts>
+        <Facturier onNouvelle={() => {}} stockage={stockage} navigateurPieces={{
+          ouvrirOnglet: () => onglet,
+          creerAdresse: () => { adresses.push('blob:piece'); return 'blob:piece'; },
+          revoquerAdresse: () => undefined,
+          differer: () => undefined
+        }} />
+      </FournisseurToasts>
+    );
+    const utilisateur = userEvent.setup();
+
+    // Une seule ligne a une pièce : une seule propose de l'ouvrir.
+    expect(screen.getAllByRole('button', { name: 'Ouvrir la pièce' })).toHaveLength(1);
+    await utilisateur.click(screen.getByRole('button', { name: 'Ouvrir la pièce' }));
+    await waitFor(() => expect(onglet.location.href).toBe('blob:piece'));
+    expect(onglet.opener).toBeNull();
+
+    await utilisateur.click(screen.getByRole('button', { name: 'Pièce jointe' }));
+    // Une phrase, pas un mur : la pièce vit sur cet appareil.
+    expect(within(screen.getByRole('dialog')).getByText(/Elle vit sur cet appareil/)).toBeTruthy();
+    await utilisateur.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ouvrir la pièce' }));
+    await waitFor(() => expect(adresses).toHaveLength(2));
+  });
+});
+
+/*
+ * LE MODE DE RÈGLEMENT MANQUANT (reprise de l'ancienne version). La facture
+ * est ENCAISSÉE — le statut se lit sur la date d'encaissement, et rien d'autre.
+ * La déclarer « en retard » ferait relancer un client qui a payé ; lui
+ * reproposer « Enregistrer le règlement » ferait encaisser deux fois. Le
+ * manque est une mention du livre à compléter, pas un impayé.
+ */
+it('une facture encaissée sans mode de règlement reste encaissée', () => {
+  semer([recette({ id: 'r1', emiseLe: dateISO('2026-05-01'), encaisseeLe: dateISO('2026-06-10'), modeReglement: null })]);
+  rendre();
+  // La ligne, et non l'écran : le filtre « En retard » est toujours là.
+  const ligne = screen.getByText('Prestation').closest('li') as HTMLElement;
+  expect(within(ligne).getByText('Encaissée')).toBeTruthy();
+  expect(within(ligne).queryByText('En retard')).toBeNull();
+  expect(within(ligne).queryByRole('button', { name: 'Enregistrer le règlement' })).toBeNull();
 });
 
 /* ─────────────────────────────────────────────────────────────────────────

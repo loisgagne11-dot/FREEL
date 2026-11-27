@@ -72,6 +72,15 @@ function moisLisible(m: string): string {
   });
 }
 
+/**
+ * « de juillet 2026 », « d’août 2026 » : la préposition élidée devant une
+ * voyelle. « La facture de août » se lit comme une coquille, et c'est la
+ * phrase que l'on relit le plus en fin d'été.
+ */
+export function deMois(lisible: string): string {
+  return /^[aeiouyéèêh]/iu.test(lisible) ? `d’${lisible}` : `de ${lisible}`;
+}
+
 const texte = (v: unknown): string => (typeof v === 'string' ? v : '');
 const nombre = (v: unknown): number => (typeof v === 'number' ? v : 0);
 
@@ -114,6 +123,22 @@ export function formuler(sujet: SujetATraiter): SujetFormule {
         + 'une suite, ou une autre mission à trouver.',
       action: 'Préparer la suite',
       levier: 'la mission s’ouvre sur son formulaire : prolonge sa fin, dis sa reconduction, ou arrête-la'
+    };
+  }
+
+  /* Les factures émises ailleurs (22/11) : le mois, le payeur, ce que le
+     planning compte. Le geste mène au facturier, où le formulaire s'ouvre
+     prérempli. */
+  if (sujet.id.startsWith('facture-a-enregistrer-')) {
+    const client = texte(d['client']);
+    return {
+      intitule: `Enregistrer la facture ${deMois(moisLisible(texte(d['mois'])))}`,
+      contexte: `${client !== '' ? client : pluriel(sujet.nombre, 'client', 'clients')} · `
+        + `${euro(nombre(d['montant']))} HT d’après le planning. Émise dans ton logiciel, elle `
+        + 's’enregistre ici avec son numéro et son PDF : sans elle, ni le reste à rentrer ni les '
+        + 'relances ne la connaissent.',
+      action: 'Enregistrer',
+      levier: 'le client et le montant sont repris du planning ; il reste le numéro, les dates et le PDF'
     };
   }
 

@@ -1,13 +1,15 @@
-import type { DateISO } from '../domain/types';
+import type { DateISO, Euros, Mois } from '../domain/types';
 import type { ModeReglement } from '../domain/calculs/livreRecettes';
 import { ecritureDAnnulation, prochainNumero } from '../domain/calculs/ecritureRecette';
+import { numeroDejaPris } from '../domain/calculs/emission';
 import type { Faits, Recette } from './schema';
 import { ecrireFaits, useFaits } from './store';
 import { dateDuJour } from './selecteurs';
 
 /**
  * Les écritures du livre des recettes : émettre, envoyer, encaisser, relancer,
- * annuler, supprimer un brouillon, joindre une pièce.
+ * annuler, supprimer un brouillon, joindre une pièce — et enregistrer une
+ * facture émise dans un autre logiciel.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * POURQUOI ELLES SORTENT DU MAGASIN
@@ -64,6 +66,115 @@ export function ajouterRecette(saisie: SaisieRecette): string {
   const recette: Recette = { ...saisie, id, numero: numeroDe(saisie, actuel.recettes) };
   ecrireFaits(avecRecettes(actuel, [...actuel.recettes, recette]));
   return id;
+}
+
+/** Ce qu'on recopie d'une facture émise dans un autre logiciel. */
+export interface SaisieFactureEmise {
+  readonly clientNom: string;
+  readonly libelle: string;
+  readonly montant: Euros;
+  readonly tvaCollectee: Euros;
+  /** Le numéro que l'autre logiciel lui a donné — jamais un numéro de FREEL. */
+  readonly numero: string;
+  readonly emiseLe: DateISO;
+  /** `null` : pas encore partie. */
+  readonly envoyeeLe: DateISO | null;
+  readonly echeanceLe: DateISO;
+  /** Le mois de prestation qu'elle couvre, ou `null` s'il n'est pas dit. */
+  readonly moisFacture: Mois | null;
+}
+
+const FORME_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+/**
+ * Enregistre une facture ÉMISE AILLEURS — Tiime ou un autre logiciel.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * UN FAIT RECOPIÉ, PAS UNE FACTURE PRODUITE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Le numéro est celui de l'autre logiciel, et il est EXIGÉ : sans lui, le
+ * livre des recettes ne renverrait à aucune pièce. Aucun numéro de FREEL n'est
+ * consommé — `numeroDe` n'est pas appelé —, sans quoi la suite de FREEL
+ * avancerait d'un cran à chaque facture de Tiime et le jour où l'on revient à
+ * FREEL, sa numérotation aurait des trous qu'aucune facture n'explique.
+ *
+ * Le numéro est unique parmi les recettes : deux écritures pour une pièce,
+ * c'est un chiffre d'affaires compté deux fois. Les dates se tiennent : une
+ * facture déjà émise n'a pas de date à venir, elle ne part pas avant
+ * d'exister, et elle n'est pas due avant d'être émise.
+ *
+ * Rend l'identifiant de la recette — la pièce jointe s'y rattache ensuite —,
+ * ou le motif du refus. Rien n'est écrit en cas de refus.
+ */
+export function enregistrerFactureEmise(
+  saisie: SaisieFactureEmise, aujourdhui: DateISO = dateDuJour()
+): { readonly id: string } | { readonly motif: string } {
+  const actuel = faitsCourants();
+  const numero = saisie.numero.trim();
+  if (numero === '') {
+    return { motif: 'Indique le numéro que ton logiciel a donné à la facture : le livre des recettes doit renvoyer à elle.' };
+  }
+  if (numeroDejaPris(numero, actuel.recettes)) {
+    return { motif: `Le numéro ${numero} est déjà au livre : une pièce, une écriture.` };
+  }
+  if (saisie.clientNom.trim() === '') return { motif: 'Indique le client à qui la facture est adressée.' };
+  if (!Number.isFinite(saisie.montant) || saisie.montant <= 0) {
+    return { motif: 'Indique le montant hors taxes de la facture.' };
+  }
+  if (!FORME_DATE.test(saisie.emiseLe)) return { motif: 'Indique la date d’émission de la facture.' };
+  if (saisie.emiseLe > aujourdhui) {
+    return { motif: 'Cette facture est déjà émise : sa date d’émission ne peut pas être à venir.' };
+  }
+  if (saisie.envoyeeLe !== null && (!FORME_DATE.test(saisie.envoyeeLe)
+    || saisie.envoyeeLe < saisie.emiseLe || saisie.envoyeeLe > aujourdhui)) {
+    return { motif: 'La date d’envoi tombe entre l’émission et aujourd’hui : une facture ne part ni avant d’exister, ni demain.' };
+  }
+  if (!FORME_DATE.test(saisie.echeanceLe) || saisie.echeanceLe < saisie.emiseLe) {
+    return { motif: 'L’échéance ne peut pas précéder l’émission.' };
+  }
+  const recette: Recette = {
+    id: nouvelId(),
+    clientNom: saisie.clientNom.trim(),
+    libelle: saisie.libelle,
+    montant: saisie.montant,
+    tvaCollectee: saisie.tvaCollectee,
+    numero,
+    emiseLe: saisie.emiseLe,
+    envoyeeLe: saisie.envoyeeLe,
+    echeanceLe: saisie.echeanceLe,
+    encaisseeLe: null,
+    modeReglement: null,
+    relancesLe: [],
+    justificatifId: null,
+    // Le document est celui de l'autre logiciel : FREEL n'en garde pas les
+    // lignes, et ne prétendra pas le rééditer.
+    lignes: null,
+    emisePar: 'externe',
+    moisFacture: saisie.moisFacture
+  };
+  ecrireFaits(avecRecettes(actuel, [...actuel.recettes, recette]));
+  return { id: recette.id };
+}
+
+/**
+ * Dit le mois qu'une facture déjà au livre couvre — celle d'avant le schéma
+ * 29, qui ne le disait pas. Rend le motif du refus, ou `null`.
+ *
+ * Le mois couvert n'est imprimé par FREEL sur aucun document — la réédition
+ * lit les lignes conservées —, c'est un fait de suivi : le dire ne réécrit
+ * pas une facture que le client a reçue. Un avoir n'a pas de mois à lui : il
+ * suit la facture qu'il annule.
+ */
+export function rattacherAuMois(id: string, mois: Mois): string | null {
+  const actuel = faitsCourants();
+  const recette = actuel.recettes.find((r) => r.id === id);
+  if (recette === undefined) return 'Recette introuvable.';
+  if (recette.emiseLe === null) return 'Ce brouillon n’est pas émis : il ne couvre encore aucun mois.';
+  if (typeof recette.annuleEcriture === 'string') return 'Un avoir suit la facture qu’il annule : il n’a pas de mois à lui.';
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/u.test(mois)) return 'Ce mois n’a pas une forme lisible.';
+  ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) => (r.id === id ? { ...r, moisFacture: mois } : r))));
+  return null;
 }
 
 /** Ce qu'un brouillon garde de la rédaction : tout, sauf la date et le numéro. */
@@ -179,6 +290,9 @@ export function consignerRelance(id: string, le: DateISO): void {
  * sans réponse à « je ne l'ai jamais reçue ». Une DATE et non un booléen : un
  * statut qu'aucune date ne prouve ne prouve rien. Rend le motif du refus, ou
  * `null`.
+ *
+ * Elle se réécrit : c'est ainsi qu'elle se CORRIGE. Elle n'est imprimée sur
+ * aucun document, contrairement à la date d'émission.
  */
 export function marquerEnvoyee(id: string, le: DateISO): string | null {
   const actuel = faitsCourants();
@@ -195,6 +309,11 @@ export function marquerEnvoyee(id: string, le: DateISO): string | null {
   if (le < recette.emiseLe) {
     return 'Une facture ne peut pas partir avant d’exister : la date d’envoi '
       + 'est antérieure à sa date d’émission.';
+  }
+  // La date se choisit désormais (22/11) : un envoi daté de demain ferait
+  // courir la relance d'une facture qui n'est pas partie.
+  if (le > dateDuJour()) {
+    return 'Cette date n’est pas encore arrivée : on consigne un envoi fait, pas prévu.';
   }
   ecrireFaits(avecRecettes(actuel, actuel.recettes.map((r) =>
     (r.id === id ? { ...r, envoyeeLe: le } : r))));

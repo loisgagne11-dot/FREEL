@@ -424,7 +424,9 @@ describe('schéma 27 → 28 : la part gardée se fond dans la réserve', () => {
    */
   it('une part de 10 % quitte le dossier et reste dite, en pourcentage, sur l’entreprise', () => {
     const f = completerFaits({ version: 27, reserve: 3000, partGardeeAuVersement: 0.1 });
-    expect(f.version).toBe(28);
+    // Le schéma courant, et non « 28 » : la migration mène au bout de la
+    // chaîne, quel que soit le nombre de marches qui suivent.
+    expect(f.version).toBe(VERSION_SCHEMA);
     expect(f).not.toHaveProperty('partGardeeAuVersement');
     expect(f.entreprise.partGardeeRetiree).toBe(10);
     // Pas convertie : la réserve est celle que l'utilisateur avait réglée.
@@ -461,9 +463,73 @@ describe('schéma 27 → 28 : la part gardée se fond dans la réserve', () => {
     expect(avec('10 %')).toMatch(/partGardeeRetiree/);
   });
 
-  /* Une version 28 qui chargerait un dossier 29 en effacerait ce qu'elle ne sait pas lire. */
-  it('refuse un dossier au schéma 29', () => {
-    expect(motifRefusFaits({ ...faitsVides(), version: 29 })).toMatch(/schéma 29/);
+});
+
+/**
+ * v28 → v29 : LES FACTURES ÉMISES AILLEURS (demandé le 22/11).
+ *
+ * Le mode d'émission est un champ du profil, comblé par `entrepriseVide()`.
+ * La provenance et le mois couvert vivent DANS chaque recette : la fusion de
+ * surface ne les atteint pas, et la migration descend jusqu'à elles.
+ */
+describe('schéma 28 → 29 : les factures émises dans un autre logiciel', () => {
+  /*
+   * Si ce test sautait, un dossier repris s'ouvrirait avec un mode
+   * `undefined` : ni « FREEL » ni « un autre logiciel », l'interrupteur
+   * n'aurait aucune position cochée, et le facturier ne saurait pas s'il doit
+   * proposer de rédiger ou d'enregistrer.
+   */
+  it('un dossier au schéma 28 émet avec FREEL — ce qu’il faisait —, et non `undefined`', () => {
+    const f = completerFaits({ version: 28, entreprise: { nom: 'Atelier de démonstration' } });
+    expect(f.version).toBe(VERSION_SCHEMA);
+    expect(f.entreprise.emissionFactures).toBe('freel');
+    expect(faitsVides().entreprise.emissionFactures).toBe('freel');
+  });
+
+  /*
+   * La migration DESCEND dans la liste des recettes. Sans elle, chaque
+   * recette reprise porterait `undefined` : le jour où un lecteur écrirait
+   * `moisFacture === null` pour reconnaître une facture sans mois dit, toutes
+   * les factures d'avant passeraient pour des factures d'un mois inconnu
+   * nommé `undefined`.
+   */
+  it('chaque recette reprise est de FREEL, sans mois couvert dit — pas celui de son émission recopié', () => {
+    const f = completerFaits({ version: 28, recettes: [
+      { id: 'r1', clientNom: 'Client démo', libelle: 'Prestation', montant: 1000, emiseLe: '2026-09-02',
+        encaisseeLe: null, modeReglement: null, numero: '2026-001' }
+    ] });
+    expect(f.recettes[0]).toMatchObject({ emisePar: 'freel', moisFacture: null });
+  });
+
+  it('garde une provenance et un mois déjà dits, et écarte ce qui n’en a pas la forme', () => {
+    const recette = (emisePar: unknown, moisFacture: unknown) => ({
+      id: 'r1', clientNom: 'Client démo', libelle: 'Prestation', montant: 1000, emiseLe: '2026-09-02',
+      encaisseeLe: null, modeReglement: null, numero: 'F-0001', emisePar, moisFacture
+    });
+    const gardee = completerFaits({ version: 29, recettes: [recette('externe', '2026-08')] });
+    expect(gardee.recettes[0]).toMatchObject({ emisePar: 'externe', moisFacture: '2026-08' });
+    const ecartee = completerFaits({ version: 29, recettes: [recette('tiime', '2026-13')] });
+    expect(ecartee.recettes[0]).toMatchObject({ emisePar: 'freel', moisFacture: null });
+  });
+
+  it('un mode, une provenance ou un mois venus d’ailleurs sont contrôlés', () => {
+    const avecMode = (emissionFactures: unknown) =>
+      motifRefusExterieur({ ...faitsVides(), entreprise: { ...entrepriseVide(), emissionFactures } });
+    expect(avecMode('externe')).toBeNull();
+    expect(avecMode('tiime')).toMatch(/emissionFactures/);
+    const avecRecette = (champs: Record<string, unknown>) => motifRefusExterieur({ ...faitsVides(), recettes: [{
+      id: 'r1', clientNom: 'Client démo', libelle: 'Prestation', montant: 1000, emiseLe: '2026-09-02',
+      encaisseeLe: null, modeReglement: null, numero: 'F-0001', ...champs
+    }] });
+    expect(avecRecette({ emisePar: 'externe', moisFacture: '2026-08' })).toBeNull();
+    expect(avecRecette({ emisePar: 'externe', moisFacture: null })).toBeNull();
+    expect(avecRecette({ emisePar: 'ailleurs' })).toMatch(/recette n° 1/);
+    expect(avecRecette({ moisFacture: '08/2026' })).toMatch(/recette n° 1/);
+  });
+
+  /* Une version 29 qui chargerait un dossier 30 en effacerait ce qu'elle ne sait pas lire. */
+  it('refuse un dossier au schéma 30', () => {
+    expect(motifRefusFaits({ ...faitsVides(), version: 30 })).toMatch(/schéma 30/);
   });
 });
 
@@ -1046,9 +1112,9 @@ describe('schéma 22 → 23 : le motif « mis de côté pour l’impôt »', () 
 
   it('un dossier d’un schéma postérieur est refusé', () => {
     expect(motifRefusFaits({ ...faitsVides(), version: VERSION_SCHEMA + 1 })).not.toBeNull();
-    // 28 depuis le lot 49 : la part gardée fondue dans la réserve. L'attente
-    // suit le numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
-    expect(VERSION_SCHEMA).toBe(28);
+    // 29 depuis les factures émises ailleurs (22/11). L'attente suit le
+    // numéro, elle ne le fige pas — ce test dit qu'un saut se voit.
+    expect(VERSION_SCHEMA).toBe(29);
   });
 });
 

@@ -117,6 +117,28 @@ export function typeAccepte(typeMime: string): boolean {
 }
 
 /**
+ * Pourquoi ce fichier ne peut pas devenir une pièce, ou `null` s'il le peut.
+ *
+ * Les contrôles du dépôt, seuls, pour qu'un formulaire les applique AVANT
+ * d'écrire le fait auquel la pièce se rattachera : la facture émise ailleurs
+ * s'enregistrait, puis son PDF était refusé, et l'on se retrouvait avec une
+ * facture sans pièce sans l'avoir choisi. Une seule règle : `deposerJustificatif`
+ * l'applique lui aussi, un formulaire qui la recopierait finirait par en
+ * accepter un que le dépôt refuse.
+ */
+export function motifRefusFichier(f: { readonly typeMime: string; readonly taille: number }): string | null {
+  if (f.taille === 0) return 'Le fichier est vide.';
+  if (f.taille > TAILLE_MAX_OCTETS) {
+    return `Fichier trop volumineux (${Math.round(f.taille / (1024 * 1024))} Mo, maximum `
+      + `${TAILLE_MAX_OCTETS / (1024 * 1024)} Mo).`;
+  }
+  if (!typeAccepte(f.typeMime)) {
+    return `Format non accepté (${f.typeMime}). Formats acceptés : PDF, JPEG, PNG, HEIC, WebP.`;
+  }
+  return null;
+}
+
+/**
  * Dépose une pièce, après contrôles.
  *
  * Le contrôle précède l'écriture, et l'empreinte est calculée sur le contenu
@@ -130,23 +152,8 @@ export async function deposerJustificatif(
   fait: RattachementFait,
   maintenant: Date = new Date()
 ): Promise<ResultatDepot> {
-  if (fichier.contenu.size === 0) {
-    return { statut: 'refuse', motif: 'Le fichier est vide.' };
-  }
-  if (fichier.contenu.size > TAILLE_MAX_OCTETS) {
-    const mo = Math.round(fichier.contenu.size / (1024 * 1024));
-    return {
-      statut: 'refuse',
-      motif: `Fichier trop volumineux (${mo} Mo, maximum `
-        + `${TAILLE_MAX_OCTETS / (1024 * 1024)} Mo).`
-    };
-  }
-  if (!typeAccepte(fichier.typeMime)) {
-    return {
-      statut: 'refuse',
-      motif: `Format non accepté (${fichier.typeMime}). Formats acceptés : PDF, JPEG, PNG, HEIC, WebP.`
-    };
-  }
+  const refus = motifRefusFichier({ typeMime: fichier.typeMime, taille: fichier.contenu.size });
+  if (refus !== null) return { statut: 'refuse', motif: refus };
 
   const empreinte = await empreinteDe(fichier.contenu);
   const meta: MetaJustificatif = {

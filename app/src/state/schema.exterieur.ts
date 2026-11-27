@@ -35,7 +35,39 @@ const CLES_INTERDITES: ReadonlySet<string> = new Set(['__proto__', 'constructor'
  */
 export function motifRefusExterieur(brut: unknown): string | null {
   return motifRefusFaits(brut) ?? motifRefusChampsDuSchema25(brut) ?? motifRefusChampsDuSchema26(brut)
-    ?? motifRefusChampsDuSchema27(brut) ?? motifRefusChampsDuSchema28(brut) ?? motifRefusValeurs(brut);
+    ?? motifRefusChampsDuSchema27(brut) ?? motifRefusChampsDuSchema28(brut) ?? motifRefusChampsDuSchema29(brut)
+    ?? motifRefusValeurs(brut);
+}
+
+/**
+ * Les champs apparus au schéma 29, contrôlés quelle que soit la version
+ * annoncée, comme ceux du 25 au 28.
+ *
+ * Un mode inconnu se lirait « FREEL » sans un mot : l'écran proposerait de
+ * rédiger des factures qui s'émettent ailleurs, sous une seconde numérotation.
+ * Une provenance inconnue ferait « revoir » une facture de Tiime comme un
+ * document de FREEL. Un mois illisible ne serait retrouvé par aucun mois du
+ * planning : la facture ne couvrirait rien, et le mois resterait « à
+ * enregistrer » pour toujours. Absents, ils sont légitimes : la migration les
+ * comble.
+ */
+function motifRefusChampsDuSchema29(brut: unknown): string | null {
+  if (!estObjet(brut)) return null;
+  const entreprise = brut['entreprise'];
+  const mode = estObjet(entreprise) ? entreprise['emissionFactures'] : undefined;
+  if (mode !== undefined && mode !== 'freel' && mode !== 'externe') {
+    return 'Le champ « entreprise.emissionFactures » devrait être « freel » ou « externe ».';
+  }
+  for (const [i, r] of elements(brut['recettes']).entries()) {
+    if (!estObjet(r)) continue;
+    const par = r['emisePar'];
+    const mois = r['moisFacture'];
+    if ((par !== undefined && par !== 'freel' && par !== 'externe')
+      || (mois != null && (typeof mois !== 'string' || !FORME_MOIS.test(mois)))) {
+      return `La recette n° ${i + 1} porte une provenance ou un mois facturé illisibles : rien n’a été chargé.`;
+    }
+  }
+  return null;
 }
 
 /**

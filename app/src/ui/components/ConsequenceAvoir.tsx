@@ -2,6 +2,7 @@ import type { DateISO, Euros } from '../../domain/types';
 import { montantsDeLaFacture } from '../../domain/calculs/facturier';
 import { dateCourte, eur } from '../format';
 import { Montant } from './Montant';
+import { type ModeEmission, emiseParFreel } from '../../domain/calculs/emission';
 
 /**
  * Ce qu'écrit un avoir, dit avant qu'il s'écrive.
@@ -24,11 +25,17 @@ export function ConsequenceAvoir(
       readonly clientNom: string;
       readonly numero: string;
       readonly encaisseeLe: DateISO | null;
+      readonly emisePar?: ModeEmission;
     };
     readonly aujourdhui: DateISO;
   }
 ) {
   const m = montantsDeLaFacture(r);
+  /* Une facture de Tiime s'annule dans Tiime : son avoir y prend son numéro.
+     FREEL n'en inscrit que l'écriture inverse — le taire laisserait croire que
+     le document part d'ici, et le client n'en recevrait aucun. */
+  const ailleurs = emiseParFreel(r) ? null
+    : <> L’avoir lui-même s’émet dans ton logiciel&nbsp;: FREEL n’en inscrit que l’écriture.</>;
   const client = r.clientNom !== '' ? r.clientNom : 'ce client';
   // Le montant tel qu'il a circulé : TTC quand il y a une TVA, avec le
   // hors-taxe qui, lui, se déclare.
@@ -42,7 +49,7 @@ export function ConsequenceAvoir(
         Le livre des recettes portera un remboursement de {montant} au
         {' '}{dateCourte(aujourdhui)}&nbsp;: le chiffre d’affaires à déclarer
         baisse d’autant, et les cotisations avec. À ne faire que si tu
-        rembourses {client}. Un avoir ne se défait pas.
+        rembourses {client}. Un avoir ne se défait pas.{ailleurs}
       </>
     );
   }
@@ -50,7 +57,7 @@ export function ConsequenceAvoir(
     <>
       Les {montant} attendus de {client} ne seront plus dus&nbsp;: la facture
       {' '}{r.numero || 'sans numéro'} sort du reste à rentrer. Un avoir ne se
-      défait pas — pour refacturer, il faudra une nouvelle facture.
+      défait pas — pour refacturer, il faudra une nouvelle facture.{ailleurs}
     </>
   );
 }
