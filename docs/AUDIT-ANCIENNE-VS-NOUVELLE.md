@@ -100,7 +100,7 @@ un trou qui ne fait échouer aucun test.
 | `showDaysEditor`, `saveDaysFromEditor`, `recalcDaysTable` | ✅ | Vue semaine avec ajustement à la journée ; l'ajustement l'emporte sur le rythme, **y compris à zéro** |
 | `fillAllDays` — remplir le mois d'un geste | 🚫 | **Sans objet ici.** Le planning se remplit déjà seul depuis le rythme, c'est le modèle même. Remplir à la main n'aurait de sens que sur un planning vide — et un planning vide se remplit en déclarant un rythme, pas en cliquant trente et une fois |
 | `resetReelsToTheorique` — revenir au rythme | ✅ | **Ajouté le 13/08**, à la maille de la semaine. Le bouton n'apparaît que si elle porte une correction |
-| `buildCRAData`, `generateCRAHTMLContent`, `generateCRAPDF` | ✅ | **Lot P (29/08) : le générateur de CRA.** Atelier deux colonnes dans Outils › CRA — saisie à gauche, aperçu du document à droite, `Imprimer` et `Télécharger` en pied. Le document est une **synthèse hebdomadaire** : par semaine, les jours par client ventilés télétravail / sur site, la phrase de tâches, puis les totaux par client et le grand total. Le fichier téléchargé est **autonome** — il emporte sa feuille de style, parce qu'il s'ouvre chez le client sans notre application autour |
+| `buildCRAData`, `generateCRAHTMLContent`, `generateCRAPDF` | ✅ | **Lot P (29/08) : le générateur de CRA.** Atelier deux colonnes dans Outils › CRA — saisie à gauche, aperçu du document à droite, `Imprimer` et `Télécharger` en pied. Le document est une **synthèse hebdomadaire** : par semaine, les jours par client ventilés télétravail / sur site, la phrase de tâches, puis les totaux par client et le grand total. Le fichier téléchargé est **autonome** — il emporte sa feuille de style, parce qu'il s'ouvre chez le client sans notre application autour. **Depuis le 27/11, ce fichier est un vrai PDF** (« Télécharger le PDF », voir la section du 27/11) : le HTML autonome a quitté le CRA |
 | Le CRA porte un montant | 🚫 | **Retiré au lot P.** La carte d'Activité affichait le total de jours ET sa valorisation au TJM sur le document. Un CRA qui porte un prix se renégocie au lieu de se signer. La valorisation reste sur l'écran Activité, où elle s'adresse à l'utilisateur, et ne figure sur aucun papier remis au client |
 | La ventilation télétravail / sur site du CRA | ✅ | **Lot P.** Lue sur le `lieu` des journées du planning. Une journée dont le lieu n'a jamais été renseigné va dans une colonne `sans lieu` et **jamais** dans « télétravail » : une mission facturée « sur site » qui ne l'a pas été se conteste. Quand aucune journée du mois ne porte de lieu, les deux colonnes disparaissent au lieu d'afficher deux zéros |
 | Les tâches accomplies de la semaine | ✅ | **Lot P, schéma 17 (`notesCra`).** Le seul fait du CRA qui se saisisse — tout le reste se dérive du planning. Enregistré par lundi ET par destinataire : la note d'un client ne suit pas sur le document d'un autre |
@@ -802,3 +802,19 @@ jamais en silence.
 Ce qui n'est pas fait : le temps réel (sorti du plan, F9) — un ordinateur
 resté au premier plan sans qu'on y touche ne reçoit rien avant qu'on y
 revienne ou qu'on y modifie quelque chose.
+
+## 27/11 — Le compte rendu d'activité en PDF
+
+Demandé par le propriétaire : « télécharger le CRA en format PDF.
+Actuellement c'est du HTML. » L'ancienne passait par jsPDF (`generateCRAPDF`,
+419 Ko chargés d'office) ; la nouvelle écrit le format elle-même, chargée au
+clic, et le PDF lit le **même modèle** que l'aperçu.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| `generateCRAPDF` — le CRA en PDF | 🟢 | Activité › Compte rendu, « Télécharger le PDF » (bouton principal) : `CRA_<aaaa-mm>_<client>.pdf` ou `…_tous-clients.pdf`, A4, Helvetica, un fichier qui se signe et s'archive. Sans bibliothèque : `infra/pdf` (écrivain pur, testé) et `documents/craPdf` (mise en page), 15,7 Ko à part, chargés au clic — l'entrée ne bouge pas d'un octet. Relu par pdfinfo, pdftotext et pypdf en mode strict |
+| Le PDF dit ce que l'aperçu montre | 🆕 | `modeleDuCra` décide de chaque texte une fois ; `DocumentCra` (HTML) et `craPdf` le placent. Un test compare le texte de l'aperçu et celui du PDF, dans le même ordre, sur une et deux pages. Le PDF téléchargé depuis l'écran porte la note du client qui signe, jamais celle d'un autre |
+| Un mois qui dépasse la page | 🆕 | Saut de page : les colonnes se redisent en haut de la suivante, le titre des totaux aussi ; « 1 / 2 » en pied |
+| Le téléchargement HTML autonome du CRA | 🚫 retiré | Il ne s'ouvrait proprement que dans un navigateur ; le PDF le remplace. « Imprimer » reste |
+| Le PDF de la facture | 🟢 inchangé | La facture garde « Imprimer → Enregistrer en PDF » et son téléchargement HTML (`downloadInvoiceAsHTML` plus haut) : hors de ce lot, la « facture en PDF » est rangée dans la liste de sortie |
+

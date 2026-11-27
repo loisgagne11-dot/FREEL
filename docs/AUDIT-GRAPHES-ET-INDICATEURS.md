@@ -132,7 +132,7 @@ pour laquelle ce document a été ouvert.
 | V12 | Sparklines dans les tuiles | ✅ | ❌ | 🚫 §5.5 |
 | V13 | Dépendance client | ✅ | ✅ | ⚠️ barre segmentée + légende chiffrée |
 | V14 | Occupation avec repère 100 % | ⚠️ | ✅ | ✅ **jauge livrée** (lot C4) dans « Le mois en chiffres », avec son dénominateur écrit dessous. La tuile qui donnait un SECOND chiffre d'occupation sur le même écran est retirée&nbsp;: §1.3 |
-| V24 | **Le compte rendu d'activité, semaine par semaine** | ⚠️ liste de numéros de jours | ✅ | ✅ **livré au lot P** — Outils › CRA, atelier deux colonnes avec aperçu vivant. Par semaine&nbsp;: le rang dans le mois, la plage réellement travaillée, une ligne par client ventilée télétravail / sur site, la phrase de tâches. Puis les totaux par client et le grand total. L'ancienne rendait « 1 2 3 4 7 8 9½ 10 »&nbsp;: exact et illisible — un client qui signe veut le volume, pas un calendrier à recopier |
+| V24 | **Le compte rendu d'activité, semaine par semaine** | ⚠️ liste de numéros de jours | ✅ | ✅ **livré au lot P** — Outils › CRA, atelier deux colonnes avec aperçu vivant. Par semaine&nbsp;: le rang dans le mois, la plage réellement travaillée, une ligne par client ventilée télétravail / sur site, la phrase de tâches. Puis les totaux par client et le grand total. L'ancienne rendait « 1 2 3 4 7 8 9½ 10 »&nbsp;: exact et illisible — un client qui signe veut le volume, pas un calendrier à recopier. **27/11** : ces nombres partent aussi en PDF, lus sur le même modèle que l'aperçu |
 | V25 | **La facture, pendant qu'on l'écrit** | ⚠️ après émission | ✅ | ✅ **livrée au lot Q** — atelier deux colonnes, aperçu qui suit la frappe, bandeau « brouillon » tant que le numéro n'est pas attribué. Elle porte le HT, la TVA et le net à payer |
 | V15 | Impôt par tranche | ✅ barres | ✅ barres | ⚠️ **tableau exact** — progrès, la barre était décorative |
 | V16 | Projection par scénarios | ✅ | ❌ | 🚫 §5.5 |
@@ -1121,3 +1121,17 @@ que la barre du haut montre sur tous les écrans.
 | État de la synchronisation automatique | Pastille du haut ; pastille de la carte | « à jour / à envoyer / à recevoir / diffère » de la seule première liaison | Publié par le moteur (une source, `infra/synchro.etat`) : à jour, envoi…, hors ligne (avec ou sans changements à envoyer), à choisir, mise à jour en attente (formulaire ouvert), reconnecte-toi, mets FREEL à jour, à vérifier, démonstration, en échec. Ne s'invente pas : tant que le moteur n'a rien dit, la pastille donne l'heure de la dernière synchronisation, qui reste vraie |
 | Dates de « À choisir » | Carte « À choisir » | — | « Cet appareil a été modifié à … » : la dernière modification vue ici depuis la synchronisation (horloge de l'appareil) — ou « depuis la dernière synchronisation » si elle n'a pas été vue ; « le compte à … » : `maj_le` de l'état distant. Elles disent QUAND, pas qui a raison |
 | Contenu des deux côtés | Carte « À choisir » | — | « N recette(s), M dépense(s), K client(s) » ici et sur le compte, comptés sur les faits — ceux du compte après la validation du schéma |
+
+## 27/11 — Le compte rendu d'activité en PDF
+
+Aucun nombre ajouté ni retiré : le PDF porte ceux de V24 — jours par semaine,
+par client, ventilés télétravail / sur site, « dont … sans lieu », totaux par
+client, grand total —, déjà formatés par `modeleDuCra`, le module que
+l'aperçu lit aussi. Un second formatage (« 4.5 j » d'un côté, « 4,5 j » de
+l'autre) n'est plus possible : un test compare le texte de l'aperçu et celui
+du PDF, dans le même ordre.
+
+| Nombre | Où il se lit | Avant | Maintenant |
+|---|---|---|---|
+| Jours de la semaine, du client, du mois (V24) | Aperçu du CRA, fichier téléchargé | Aperçu et fichier HTML (le même nœud sérialisé) | Aperçu et PDF, depuis le même modèle ; « 1 / 2 » en pied du PDF, qui n'est pas un nombre de l'activité |
+

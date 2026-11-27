@@ -56,7 +56,7 @@ l'ancienne `index.html` pour ses liaisons externes. `npm audit` lancé le 13/11.
 | Traceurs, CDN | Aucun : `connect-src` n'autorise que l'origine et le projet du compte | `app/index.html` |
 | Écrasement entre appareils | Verrou de version vérifié par le serveur dans la requête | `pousserFaits` |
 | Effacement | Prouvé par relecture, jamais annoncé sur la foi d'un « succès » | `effacerLigne` (lot 25) |
-| Sorties | CSV neutralisé contre les formules ; titre de document échappé ; aucun `dangerouslySetInnerHTML` | `livreRecettesCsv.ts`, `telechargement.ts` |
+| Sorties | CSV neutralisé contre les formules ; titre de document échappé ; aucun `dangerouslySetInnerHTML` ; PDF du compte rendu (27/11) : chaînes échappées (`(`, `)`, `\`), octets hauts en octal, titre en UTF-16, ni JavaScript ni formulaire ni action — joué au corpus hostile | `livreRecettesCsv.ts`, `telechargement.ts`, `pdf.ts` |
 | Pièces | Taille bornée, types listés (pas de SVG), empreinte SHA-256, jamais envoyées au compte | `infra/justificatifs.ts` |
 | Perte locale | Copie avant restauration, deux onglets, quota plein | lot 1 |
 | Confidentialité du dépôt | Balayage des formes (SIRET, IBAN, courriel) | `tests/smoke-test.js` |
