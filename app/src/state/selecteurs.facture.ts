@@ -24,6 +24,7 @@ import {
   regimeDeLaFacture, totaux
 } from '../domain/calculs/facture';
 import { prochainNumero } from '../domain/calculs/ecritureRecette';
+import { emiseParFreel } from '../domain/calculs/emission';
 import {
  type FactureSuivie, type StatutFacture,
   encoursDe, suivre
@@ -34,13 +35,6 @@ import type { DateISO, Euros } from '../domain/types';
 import { euros } from '../domain/types';
 import type { Client, Faits, Recette } from './schema';
 import { dateDuJour, debutTvaEffectif } from './selecteurs';
-import type { Mois } from '../domain/types';
-import {
-  type BrouillonDeFacture, type FactureEmise, type LigneDeBrouillon, brouillonsDuMois,
-  cleDuBrouillon, ventilerParFacturation
-} from '../domain/calculs/brouillon';
-import { previsionDuMois } from '../domain/calculs/prevision';
-import { libelleDeLaLigne, planningsDuMois } from './selecteurs.prevision';
 import {
   FORMULE_PAR_DEFAUT, echeanceDe
 } from '../domain/calculs/delaiPaiement';
@@ -106,6 +100,16 @@ export function reediterFacture(faits: Faits, numero: string): ReeditionFacture 
   const recette = faits.recettes.find((r) => r.numero === numero);
   if (recette === undefined) {
     return { cas: 'impossible', motif: 'Aucune facture ne porte ce numéro.' };
+  }
+  /* Une facture de Tiime n'a pas de document FREEL : le reconstruire produirait,
+     sous son numéro, un papier que le client n'a jamais reçu. L'adresse
+     `#/facture/<numéro>` se colle à la main ; le bouton seul ne suffit pas. */
+  if (!emiseParFreel(recette)) {
+    return {
+      cas: 'impossible',
+      motif: 'Elle a été émise dans ton logiciel de facturation : FREEL n’en produit pas le document. '
+        + 'Sa pièce jointe s’ouvre depuis Factures.'
+    };
   }
 
   const client = faits.clients.find((c) => c.nom === recette.clientNom);
@@ -252,89 +256,7 @@ function parDateDecroissante(
   return (b.recette.emiseLe ?? '').localeCompare(a.recette.emiseLe ?? '');
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   La facture du mois, avant qu'elle existe
-   ───────────────────────────────────────────────────────────────────────── */
-
-/**
- * Les brouillons de facture du mois, dérivés du planning.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * IL SUIT L'ACTIVITÉ PARCE QU'IL N'EN EST PAS SÉPARÉ
- * ─────────────────────────────────────────────────────────────────────────
- *
- * « La facture du mois en cours est créée en brouillon et se met à jour en
- * fonction de mes modifications d'Activité. » Un brouillon enregistré serait
- * juste à l'instant de sa création puis faux dès la première journée corrigée,
- * et il faudrait le resynchroniser — c'est-à-dire réécrire un fait à partir
- * d'un calcul, ce que cette application s'interdit partout ailleurs.
- *
- * Celui-ci n'est stocké nulle part. Il vient du même planning que le CRA et
- * que la prévision, ce qui garantit que les trois disent le même nombre de
- * journées : une facture qui ne collerait pas au compte rendu signé est
- * exactement le document qu'on ne veut pas envoyer.
- *
- * Les journées valorisées sont les journées RETENUES — ajustements compris —
- * et non les journées prévues : on facture ce qui a été fait.
- *
- * Une mission facturée en commun rend une ligne par client opérationnel, au
- * payeur de la mission — comme avant le schéma 24. Facturée client par client,
- * elle rend une ligne par client opérationnel ET par payeur : les journées sont
- * réparties selon la plage qui les couvre, puis valorisées par la même
- * `previsionDuMois` que la prévision du mois — la somme des parts retombe donc
- * sur le tout, au centime.
- */
-export function brouillonsDeFacture(
-  faits: Faits,
-  m: Mois
-): readonly BrouillonDeFacture[] {
-  const lignes: LigneDeBrouillon[] = planningsDuMois(faits, m)
-    .flatMap(({ mission, entite, planning }) => {
-      const libelle = libelleDeLaLigne(mission, entite);
-      // Le client qui REÇOIT la facture, et non celui chez qui l'on travaille :
-      // une mission passée par une agence a les deux, et c'est l'agence qui paie.
-      return [...ventilerParFacturation(planning, entite.rythmes, mission)]
-        .map(([clientNom, jours]) => {
-          const p = previsionDuMois(m, jours, entite.rythmes, mission.tjm);
-          return {
-            missionId: mission.id,
-            entiteId: entite.id,
-            libelle,
-            clientNom,
-            cle: cleDuBrouillon(clientNom, mission, entite.id),
-            jours: p.joursRetenus,
-            montant: p.montantRetenu
-          };
-        });
-    })
-    .filter((l) => l.clientNom !== '');
-
-  return brouillonsDuMois(m, lignes, facturesEmisesDuMois(faits, m));
-}
-
-/**
- * Les factures déjà émises ce mois-là, par client.
- *
- * Sert à marquer un brouillon plutôt qu'à le supprimer : voir côte à côte ce
- * qui a été facturé et ce que le planning compte est la seule façon de
- * remarquer un écart avant que le client le remarque.
- *
- * La date retenue est celle d'ÉMISSION : c'est celle que porte le document, et
- * celle qu'on a en tête en cherchant « la facture de juin ».
- */
-function facturesEmisesDuMois(faits: Faits, m: Mois): ReadonlyMap<string, FactureEmise> {
-  const parClient = new Map<string, FactureEmise>();
-  for (const r of faits.recettes) {
-    if (r.emiseLe === null || !r.emiseLe.startsWith(m)) continue;
-    if (typeof r.annuleEcriture === 'string') continue;
-    // Le montant CUMULÉ du mois, et non celui de la première facture : deux
-    // factures au même client le même mois se comparent au planning
-    // ensemble. N'en retenir qu'une afficherait un écart qui n'existe pas.
-    const acc = parClient.get(r.clientNom);
-    parClient.set(r.clientNom, {
-      numero: acc === undefined ? r.numero : `${acc.numero} +`,
-      montant: euros((acc?.montant ?? 0) + r.montant)
-    });
-  }
-  return parClient;
-}
+/* La facture du mois, avant qu'elle existe, vit dans `selecteurs.brouillon` :
+   « À faire » la lit au démarrage du Pilote, et ce module-ci emporte les
+   mentions et la réédition. Réexportée pour ses lecteurs d'avant. */
+export { brouillonsDeFacture } from './selecteurs.brouillon';

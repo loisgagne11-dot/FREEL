@@ -74,6 +74,9 @@ export function ecritureDAnnulation(
     encaisseeLe: aujourdhui,
     modeReglement: origine.modeReglement,
     numero: origine.numero,
-    annuleEcriture: origine.id
+    annuleEcriture: origine.id,
+    // L'avoir d'une facture de Tiime vient de Tiime : FREEL n'en inscrit que
+    // l'écriture, et ne proposera pas plus de le rééditer que la facture.
+    ...(origine.emisePar === 'externe' ? { emisePar: 'externe' as const } : {})
   };
 }

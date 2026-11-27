@@ -71,6 +71,27 @@ describe('numérotation', () => {
       .toContain('2');
   });
 
+  /*
+   * LA SUITE D'UN AUTRE LOGICIEL N'EST PAS CELLE DE FREEL. Tiime numérote
+   * « 2026-012 » quand FREEL s'est arrêté à 2026-001 : la suite annoncerait
+   * dix numéros manquants qu'aucune facture de FREEL n'a jamais portés — une
+   * alarme fausse sur le registre, dans le sens qui fait peur.
+   */
+  it('ne compte pas dans la suite une facture numérotée par un autre logiciel', () => {
+    expect(natures([
+      ecriture({ id: 'a', numero: '2026-001' }),
+      ecriture({ id: 'b', numero: '2026-012', emisePar: 'externe' })
+    ])).not.toContain('numero_manquant_dans_la_suite');
+  });
+
+  /* Le doublon, lui, se contrôle sur tout le livre : une pièce, une écriture. */
+  it('signale encore un numéro en double, d’où qu’il vienne', () => {
+    expect(natures([
+      ecriture({ id: 'a', numero: '2026-001' }),
+      ecriture({ id: 'b', numero: '2026-001', emisePar: 'externe' })
+    ])).toContain('numero_duplique');
+  });
+
   it('ne signale rien sur une suite continue', () => {
     expect(natures([
       ecriture({ id: 'a', numero: '2026-001' }),

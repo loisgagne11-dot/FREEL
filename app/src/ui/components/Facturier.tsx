@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useFaits } from '../../state/store';
 import { ajouterRecette, annulerRecette, attacherJustificatifRecette, consignerRelance, encaisserRecette, marquerEnvoyee, supprimerBrouillon } from '../../state/ecritures.recettes';
@@ -42,6 +42,18 @@ import {
 } from '../../domain/calculs/brouillon';
 import styles from './Facturier.module.css';
 import { sousRouteDuBrouillon } from '../adresseBrouillon';
+import { emiseParFreel } from '../../domain/calculs/emission';
+
+/*
+ * Les factures émises dans un autre logiciel ont leur haut de facturier et leur
+ * formulaire, chacun dans son paquet : avec FREEL, personne ne les télécharge,
+ * et le facturier — déjà l'écran le plus consulté de la fin de mois — n'a pas
+ * à les attendre.
+ */
+const FacturesAEnregistrer = lazy(() => import('./Facturier.externe')
+  .then((m) => ({ default: m.FacturesAEnregistrer })));
+const FormulaireFactureEmise = lazy(() => import('./Facturier.enregistrement')
+  .then((m) => ({ default: m.FormulaireFactureEmise })));
 
 /**
  * Le facturier — toutes les factures, et ce qu'on peut en faire.
@@ -175,6 +187,12 @@ export function Facturier(
   const [aJustifier, setAJustifier] = useState<FactureSuivie<Recette> | null>(null);
   const [limite, setLimite] = useState(LIGNES_PAR_PAGE);
   const [refus, setRefus] = useState<string | null>(null);
+  /** Le formulaire d'une facture émise ailleurs : depuis un brouillon, ou vierge (`null`). */
+  const [aEnregistrer, setAEnregistrer] = useState<{ readonly brouillon: BrouillonDeFacture | null } | null>(null);
+  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
+  const moisPartage = mois ?? moisLocal;
+  const changerMois = onMois ?? setMoisLocal;
+  const externe = faits.entreprise.emissionFactures === 'externe';
 
   /*
    * L'ANNÉE CHOISIE EST L'ANCRE, PAS UN FILTRE DE PLUS.
@@ -241,7 +259,14 @@ export function Facturier(
         onDecaler={(pas) => { setDecalage((d) => d + pas); setLimite(LIGNES_PAR_PAGE); }}
       />
 
-      <BrouillonDuMois {...(mois === undefined ? {} : { mois })} {...(onMois === undefined ? {} : { onMois })} />
+      {externe
+        ? (
+          <Suspense fallback={null}>
+            <FacturesAEnregistrer mois={moisPartage} onMois={changerMois}
+              onEnregistrer={(b) => setAEnregistrer({ brouillon: b })} />
+          </Suspense>
+        )
+        : <BrouillonDuMois mois={moisPartage} onMois={changerMois} />}
 
       <div className={styles.grille}>
         <Chiffre libelle="Reste à rentrer" valeur={eur(etat.resteARentrer)} />
@@ -286,9 +311,21 @@ export function Facturier(
               il retient un numéro.
             </Info>
           </h2>
-          <button type="button" className={styles.actionPrincipale} onClick={onNouvelle}>
-            Nouvelle facture
-          </button>
+          {/* Avec un autre logiciel, FREEL ne rédige pas : le geste de l'en-tête
+              devient celui de recopier une facture émise, sans planning
+              derrière — un acompte, une prestation ponctuelle. */}
+          {externe
+            ? (
+              <button type="button" className={styles.actionPrincipale}
+                onClick={() => setAEnregistrer({ brouillon: null })}>
+                Enregistrer une facture
+              </button>
+            )
+            : (
+              <button type="button" className={styles.actionPrincipale} onClick={onNouvelle}>
+                Nouvelle facture
+              </button>
+            )}
         </header>
 
         <div className={styles.filtres} role="group" aria-label="Filtrer par état">
@@ -316,7 +353,7 @@ export function Facturier(
                même cadre font hésiter sur ce qui les distingue. */
             <Vide
               message={filtre === 'tout'
-                ? 'Aucune facture sur cette période. Émets-en une, ou élargis la période.'
+                ? `Aucune facture sur cette période. ${externe ? 'Enregistre' : 'Émets'}-en une, ou élargis la période.`
                 : 'Aucune facture dans cet état sur cette période.'}
             />
           )
@@ -331,7 +368,7 @@ export function Facturier(
                   onJeter={() => jeter(f)}
                   onRelancer={() => setARelancer(f)}
                   onEnvoyer={() => envoyer(f)}
-                  onRevoir={onRevoir === undefined || f.recette.numero === ''
+                  onRevoir={onRevoir === undefined || f.recette.numero === '' || !emiseParFreel(f.recette)
                     ? undefined
                     : () => onRevoir(f.recette.numero)}
                   onReprendre={onReprendre === undefined ? undefined : () => onReprendre(f.recette.id)}
@@ -366,6 +403,23 @@ export function Facturier(
             modeParDefaut={dernierModeDeReglement(faits, aEncaisser.recette.clientNom)}
             onValider={(date, mode) => encaisser(aEncaisser.recette.id, date, mode)}
           />
+        )}
+      </Sheet>
+
+      <Sheet
+        ouvert={aEnregistrer !== null}
+        titre="Enregistrer une facture émise"
+        onFermer={() => setAEnregistrer(null)}
+      >
+        {aEnregistrer !== null && (
+          <Suspense fallback={<p role="status" className={styles.aide}>Chargement…</p>}>
+            <FormulaireFactureEmise
+              brouillon={aEnregistrer.brouillon}
+              moisParDefaut={moisPartage}
+              stockage={stockage}
+              onFini={(message) => { setAEnregistrer(null); signaler(message); }}
+            />
+          </Suspense>
         )}
       </Sheet>
 
@@ -435,6 +489,14 @@ function Ligne(
         <span>{r.clientNom || 'Client non renseigné'}</span>
         <span aria-hidden="true">·</span>
         <span>{r.numero || 'Sans numéro'}</span>
+        {/* Dit, parce que c'est ce qui explique l'absence de « Revoir la
+            facture » : son document est celui de l'autre logiciel. */}
+        {!emiseParFreel(r) && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>émise dans ton logiciel</span>
+          </>
+        )}
         {r.emiseLe !== null && (
           <>
             <span aria-hidden="true">·</span>
@@ -675,11 +737,19 @@ function PanneauJustificatif(
         {recette.numero || 'Sans numéro'} — {recette.clientNom || 'client non renseigné'}
       </p>
 
+      {/* Les deux cas ne disent pas la même chose : une facture de FREEL se
+          reconstruit, une facture de Tiime n'existe ici que par sa pièce. Le
+          même texte pour les deux laisserait croire la seconde facultative au
+          même titre. */}
       <p className={styles.aide}>
-        Une facture émise dans l’application n’a besoin d’aucune pièce
-        jointe&nbsp;: elle se reconstruit depuis les faits. Cette pièce sert
-        aux factures établies AILLEURS, ou reprises de l’ancienne version — la
-        joindre est ce qui leur donne une valeur probante en contrôle.
+        {emiseParFreel(recette)
+          ? <>Une facture émise dans l’application n’a besoin d’aucune pièce
+            jointe&nbsp;: elle se reconstruit depuis les faits. Cette pièce sert
+            aux factures établies AILLEURS, ou reprises de l’ancienne version — la
+            joindre est ce qui leur donne une valeur probante en contrôle.</>
+          : <>Cette facture a été émise dans ton logiciel&nbsp;: FREEL n’en a pas le
+            document, et sa pièce est la seule copie qu’il en garde. La joindre est
+            ce qui lui donne une valeur probante en contrôle.</>}
       </p>
 
       {justificatifId === null
@@ -1006,7 +1076,7 @@ function PanneauRelance(
  * pourquoi c'est un bouton, et le seul de cette carte.
  */
 function BrouillonDuMois(
-  { mois: moisChoisi, onMois }: { readonly mois?: Mois; readonly onMois?: (m: Mois) => void }
+  { mois, onMois: setMois }: { readonly mois: Mois; readonly onMois: (m: Mois) => void }
 ) {
   const faits = useFaits((e) => e.faits);
   const signaler = useToast();
@@ -1018,11 +1088,10 @@ function BrouillonDuMois(
    * portait alors la barre du haut : on pouvait regarder mai en haut et la
    * facture de juin en bas, sans que rien ne le signale. Ses flèches déplacent
    * désormais le mois de l'application — elles restent là parce que c'est ici
-   * qu'on cherche la facture du mois précédent, le jour où on l'émet.
+   * qu'on cherche la facture du mois précédent, le jour où on l'émet. Le repli
+   * sur un mois local, pour un facturier monté seul, vit dans le facturier :
+   * le haut des factures émises ailleurs lit le même.
    */
-  const [moisLocal, setMoisLocal] = useState<Mois>(() => moisCourant());
-  const mois = moisChoisi ?? moisLocal;
-  const setMois = onMois ?? setMoisLocal;
   const brouillons = useMemo(() => brouillonsDeFacture(faits, mois), [faits, mois]);
   const enFranchise = emetteurDe(faits).enFranchise;
 
