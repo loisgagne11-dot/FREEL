@@ -27,7 +27,14 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    # Image figée, et non `ubuntu-latest` : le 28/11/2026, `ubuntu-latest` est
+    # passé à Ubuntu 26.04, où `playwright install --with-deps` réclame des
+    # paquets de polices qui n'y existent plus (fonts-freefont-ttf,
+    # fonts-unifont…) — l'installation du navigateur échouait, et avec elle le
+    # contrôle de chaque PR et le déploiement. Une image qui change sous nos pieds
+    # casse la publication sans qu'une ligne du dépôt ait bougé ; on monte de
+    # version quand Playwright la prend en charge, en revue, comme une dépendance.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
