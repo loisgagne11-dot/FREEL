@@ -49,7 +49,7 @@ const NOM_CRENEAU: Readonly<Record<Creneau, string>> = {
  * sur un mois qu'on ne regarde pas, et le CRA du mois affiché n'en dirait rien.
  */
 export function VueMois(
-  { planning, libellePeriode, aujourdhui, onBasculer }: {
+  { planning, libellePeriode, aujourdhui, onBasculer, apercu = null }: {
     readonly planning: PlanningPeriode;
     /**
      * « juin 2026 ». Un LIBELLÉ, pas un `Mois` : sert au sous-titre affiché
@@ -61,6 +61,12 @@ export function VueMois(
     readonly onBasculer: (
       date: DateISO, missionId: string, entiteId: string, creneau: Creneau
     ) => void;
+    /**
+     * Les moitiés que le pinceau s'apprête à poser (`date|créneau`), pendant
+     * un glissé ou une sélection au clavier. Le geste lui-même vit dans
+     * l'écran (`Activite.geste`) : la vue ne fait que l'allumer.
+     */
+    readonly apercu?: ReadonlySet<string> | null;
   }
 ) {
   const decompte = decompterJours(planning.jours);
@@ -127,6 +133,7 @@ export function VueMois(
             jour={jour}
             estAujourdhui={jour.date === aujourdhui}
             onBasculer={onBasculer}
+            apercu={apercu}
           />
         ))}
       </div>
@@ -175,12 +182,13 @@ export function VueMois(
 }
 
 function CaseDeJour(
-  { jour, estAujourdhui, onBasculer }: {
+  { jour, estAujourdhui, onBasculer, apercu }: {
     readonly jour: JourDeLaSemaine;
     readonly estAujourdhui: boolean;
     readonly onBasculer: (
       date: DateISO, missionId: string, entiteId: string, creneau: Creneau
     ) => void;
+    readonly apercu: ReadonlySet<string> | null;
   }
 ) {
   const classes = [
@@ -210,19 +218,24 @@ function CaseDeJour(
         </span>
       )}
       {jour.creneaux.map((creneau) => (
-        <Demi key={creneau.creneau} jour={jour} creneau={creneau} onBasculer={onBasculer} />
+        <Demi
+          key={creneau.creneau} jour={jour} creneau={creneau} onBasculer={onBasculer}
+          vise={apercu?.has(`${jour.date}|${creneau.creneau}`) === true}
+        />
       ))}
     </div>
   );
 }
 
 function Demi(
-  { jour, creneau, onBasculer }: {
+  { jour, creneau, onBasculer, vise }: {
     readonly jour: JourDeLaSemaine;
     readonly creneau: CreneauDuJour;
     readonly onBasculer: (
       date: DateISO, missionId: string, entiteId: string, creneau: Creneau
     ) => void;
+    /** Le pinceau va la poser : voir `apercu`. */
+    readonly vise: boolean;
   }
 ) {
   const [premier] = creneau.occupants;
@@ -239,7 +252,10 @@ function Demi(
   return (
     <button
       type="button"
-      className={`${styles.demi} ${occupe ? styles.occupee : ''} ${enConge ? styles.conge : ''}`}
+      className={`${styles.demi} ${occupe ? styles.occupee : ''} ${enConge ? styles.conge : ''} ${vise ? styles.vise : ''}`}
+      // Ce que le pinceau lit pour savoir quelle moitié est sous le pointeur.
+      data-date={jour.date}
+      data-creneau={creneau.creneau}
       // La teinte du client TEINTE la case : c'est le « couleur = client » du
       // dessin, et sur une case de 60 px c'est le seul repère qui se lit de
       // loin. `color-mix` en ligne parce que la teinte vient de la donnée.

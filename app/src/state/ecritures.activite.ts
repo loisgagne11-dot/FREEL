@@ -5,6 +5,10 @@ import { validerAjout } from '../domain/bareme/urssaf.ajout';
 import type { Faits, Mission } from './schema';
 import { ecrireFaits, useFaits } from './store';
 import { periodesUrssafEffectives } from './selecteurs';
+import {
+  type Application, type Changements, type Geste,
+  aucunChangement, annulerChangements, appliquerPinceau
+} from './pinceau';
 
 /**
  * Les écritures d'Activité (missions, planning, congés, notes de CRA) et du
@@ -45,35 +49,38 @@ export function modifierMission(id: string, modification: Partial<Omit<Mission, 
 /* ── Planning ─────────────────────────────────────────────────────────── */
 
 /**
- * Pose l'ajustement d'une journée, pour un client opérationnel.
+ * Pose un geste du planning — un clic, un glissé, un raccourci, ou ce que
+ * l'éditeur d'une demi-journée enregistre — et rend ce qu'il a changé.
  *
- * UN SEUL ÉCRIVAIN POUR UN SEUL CHAMP : `ajusterJour` l'a précédée, n'écrivait
- * qu'une quotité et FUSIONNAIT avec les créneaux posés — juste pour corriger
- * « 1 j » en « 0,5 j », faux pour un clic qui DÉPLACE la demi-journée du
- * matin vers l'après-midi. `poserAjustement` REMPLACE, et l'appelant lui donne
- * la journée entière. `null` EFFACE l'ajustement : la journée redevient ce que
- * le rythme prévoit, ce qui n'est pas « zéro ».
+ * ─────────────────────────────────────────────────────────────────────────
+ * UNE SEULE ÉCRITURE PAR GESTE
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Elle remplace `poserAjustement`, que l'écran appelait une fois par mission
+ * touchée, puis `poserPlageDeConges` pour le congé : trois écritures pour une
+ * seule intention, chacune persistée et chacune vue comme une modification
+ * par la synchronisation (lot 42). Un glissé sur deux semaines en aurait fait
+ * trente — et « Annuler » n'aurait su lesquelles défaire ensemble. La règle
+ * elle-même vit dans `state/pinceau`, pure.
+ *
+ * Rien n'a changé : on n'écrit pas. Persister pour rien ferait remonter une
+ * version sur le compte, et un autre appareil croirait à une modification.
  */
-export function poserAjustement(
-  missionId: string, entiteId: string, date: DateISO, pose: AjustementJour | null
-): void {
-  const actuel = faitsCourants();
-  const missions = actuel.missions.map((m) => {
-    if (m.id !== missionId) return m;
-    // L'ajustement vise UN client opérationnel : deux d'entre eux peuvent
-    // travailler le même jour, et corriger l'un ne doit rien changer à l'autre.
-    return {
-      ...m,
-      entites: m.entites.map((e) => {
-        if (e.id !== entiteId) return e;
-        const ajustements = { ...e.ajustements };
-        if (pose === null) delete ajustements[date];
-        else ajustements[date] = pose;
-        return { ...e, ajustements };
-      })
-    };
-  });
-  ecrireFaits({ ...actuel, missions });
+export function poserAuPinceau(geste: Geste): Application {
+  const application = appliquerPinceau(faitsCourants(), geste);
+  if (!aucunChangement(application.changements)) ecrireFaits(application.faits);
+  return application;
+}
+
+/**
+ * Défait un geste, en une écriture : seules les journées qui portent encore
+ * ce qu'il a posé sont rétablies (voir `annulerChangements`). Rend leur nombre,
+ * pour que l'écran dise si quelque chose a pu être défait.
+ */
+export function annulerAuPinceau(changements: Changements): number {
+  const { faits, rendus } = annulerChangements(faitsCourants(), changements);
+  if (rendus > 0) ecrireFaits(faits);
+  return rendus;
 }
 
 /**

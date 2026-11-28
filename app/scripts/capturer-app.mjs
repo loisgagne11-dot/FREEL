@@ -126,9 +126,17 @@ const VUES = [
      changement d'adresse. Sans rechargement, la vue du mois partait du mai
      laissé par la vue de la semaine, et « Mois précédent » photographiait
      avril. */
+  /* Le pinceau (22/11) : en semaine, un geste POSÉ — « Toute la semaine »
+     au pinceau de Studio Lumen, l'Ascension sautée et dite dans le message ;
+     au mois, la barre en main, portée et lieu ouverts, avant tout geste. La
+     barre arrive à la demande : on l'attend avant de cliquer. */
   { hash: '#/activite', nom: 'activite-planning-ferie', recharger: true,
-    ouvrir: ['Semaine précédente', 'Semaine précédente', 'Semaine précédente', 'Semaine précédente'] },
-  { hash: '#/activite', nom: 'activite-mois-ferie', recharger: true, ouvrir: ['Mois', 'Mois précédent'] },
+    avantDOuvrir: '[role="group"][aria-label="Pinceau"]',
+    ouvrir: ['Semaine précédente', 'Semaine précédente', 'Semaine précédente', 'Semaine précédente',
+      'Pinceau Studio Lumen', 'Toute la semaine'] },
+  { hash: '#/activite', nom: 'activite-mois-ferie', recharger: true,
+    avantDOuvrir: '[role="group"][aria-label="Pinceau"]',
+    ouvrir: ['Mois', 'Mois précédent', 'Pinceau Atelier Novak'] },
   /* Le carnet de commandes (lot 48) arrive avec son onglet, à la demande :
      sans l'attendre, la photo pouvait montrer « Chargement… ». */
   { hash: '#/activite', nom: 'activite-missions', handoff: 'activite-missions', ouvrir: ['Missions'],

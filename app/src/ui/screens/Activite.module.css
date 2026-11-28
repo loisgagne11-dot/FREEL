@@ -856,3 +856,15 @@
   font-weight: 640;
   color: var(--green);
 }
+
+/* Un pinceau en main : la grille se peint. Pas de sélection de texte au
+   glissé, pas de bulle « copier » à l'appui long d'iOS ; le curseur dit que
+   le clic pose au lieu d'ouvrir. Le défilement au doigt, lui, reste permis :
+   c'est le geste (`Activite.geste`) qui ne le retient qu'après l'appui long. */
+.auPinceau {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.auPinceau [data-date] { cursor: cell; }

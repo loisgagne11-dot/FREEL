@@ -88,6 +88,9 @@
 .creneau:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
 .creneau:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
+/* Ce que le pinceau va poser — voir la même règle dans VueMois. */
+.creneau.vise { box-shadow: inset 0 0 0 2px var(--green); }
+
 /* Travaillé, sans teinte de client connue : un vert neutre, faute de mieux.
    Dès qu'une couleur est choisie, le composant pose son propre fond en ligne
    (`fondBande`), et cette règle ne s'applique plus — l'inline l'emporte

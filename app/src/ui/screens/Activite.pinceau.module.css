@@ -1,0 +1,184 @@
+/* La barre de pinceaux. Aucune maquette ne la dessine : elle reprend les
+   filtres de la planche (`.e-filtres` de `direction/calme.css` — pilule,
+   filet `--line-2`, l'actif inversé en `--text` sur `--bg`) et le segment de
+   la bascule Semaine / Mois, pour ne rien inventer. Mobile d'abord. */
+
+.barre {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.etiquette {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+}
+
+/* Les puces passent à la ligne plutôt que de défiler : un pinceau caché
+   hors du cadre à droite serait un pinceau qu'on ne trouve pas. */
+.puces { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+
+.puce {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  /* 44 px au doigt, la règle du téléphone ; 40 au bureau, comme la planche. */
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  /* Un libellé long (deux missions chez le même client) passe à la ligne
+     plutôt que de pousser la barre hors de l'écran à 390 px. */
+  max-width: 100%;
+  text-align: left;
+}
+
+.puce:hover { color: var(--text); border-color: var(--muted-2); }
+.puce:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* L'actif INVERSÉ, comme les filtres de la planche : en main, le pinceau doit
+   se voir de loin — c'est lui qui dit ce que le prochain toucher va poser. */
+.puceActive,
+.puceActive:hover { background: var(--text); border-color: var(--text); color: var(--bg); }
+.puceActive .lieu { color: inherit; opacity: 0.8; }
+
+.lieu { font-weight: 500; color: var(--muted-2); }
+
+.pastille {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+/* Chaque pinceau sans client porte la marque qu'il pose sur la grille. */
+.conge { background: var(--amber); }
+.libre { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted-2); }
+.effacer { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted-2); border-radius: 2px; }
+.puceActive .libre,
+.puceActive .effacer { box-shadow: inset 0 0 0 1.5px var(--bg); }
+
+/* ── Portée, lieu ──────────────────────────────────────────────────────── */
+
+.segments {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.segment {
+  min-height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 100px;
+  background: none;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 560;
+  cursor: pointer;
+}
+
+.segment:hover { color: var(--text); }
+.segment:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.segmentActif { background: var(--panel); color: var(--text); box-shadow: var(--sh-1); }
+
+/* Le raccourci est un geste, pas un état : il se range à droite, en contour,
+   et non en vert plein — « + Nouveau » tient déjà l'action pleine de l'écran. */
+.raccourci {
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 16px;
+  border: 1px solid var(--green-line);
+  border-radius: 999px;
+  background: var(--green-glow);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.raccourci:hover { background: color-mix(in srgb, var(--green) 18%, var(--panel)); }
+.raccourci:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+.note { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* ── Ce que le geste a fait ────────────────────────────────────────────── */
+
+/* Vide entre deux gestes, mais là : voir le composant. Sans hauteur réservée
+   — une ligne vide sous la barre pousserait la grille pour rien. */
+.retour {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+/* Vide, elle ne doit pas ouvrir l'écart de la barre — mais rester dans
+   l'arbre d'accessibilité : un `display: none` la sortirait, et le premier
+   message ne serait pas annoncé. */
+.retour:empty { margin-top: -8px; }
+
+.annuler {
+  min-height: 36px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--green);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.annuler:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* Nom accessible sans encombrement visuel — le motif des vues du planning. */
+.invisible {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (min-width: 761px) {
+  .puce { min-height: 40px; }
+  .raccourci { min-height: 40px; }
+}

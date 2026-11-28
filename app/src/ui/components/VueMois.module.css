@@ -162,6 +162,11 @@
 .demi:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
 .demi:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
+/* Ce que le pinceau va poser, pendant un glissé ou une sélection au clavier.
+   Un cadre, et non un fond : la bande garde la teinte du client qui l'occupe
+   — c'est elle qu'on est en train de remplacer, et il faut la voir. */
+.demi.vise { box-shadow: inset 0 0 0 2px var(--green); }
+
 .occupee { font-weight: 700; }
 
 /* Le congé est HACHURÉ, comme dans la vue semaine.

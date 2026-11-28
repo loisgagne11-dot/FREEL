@@ -62,7 +62,7 @@ const NOM_LIEU: Readonly<Record<Lieu, string>> = {
  * déclarées, indiscernables des vraies.
  */
 export function VueSemaine(
-  { planning, aujourdhui, onBasculer, onRevenirAuRythme }: {
+  { planning, aujourdhui, onBasculer, onRevenirAuRythme, apercu = null }: {
     readonly planning: PlanningSemaine;
     readonly aujourdhui: DateISO;
     /** Bascule UN créneau d'une ligne. Ligne vide : on demande à qui l'affecter. */
@@ -71,6 +71,8 @@ export function VueSemaine(
     ) => void;
     /** Efface les corrections de la semaine : les journées redeviennent le rythme. */
     readonly onRevenirAuRythme: () => void;
+    /** Les moitiés que le pinceau s'apprête à poser — voir `VueMois`. */
+    readonly apercu?: ReadonlySet<string> | null;
   }
 ) {
   // Le bouton n'apparaît que s'il y a quelque chose à défaire. Un bouton
@@ -153,6 +155,7 @@ export function VueSemaine(
                   jour={jour}
                   creneau={creneau}
                   onBasculer={onBasculer}
+                  vise={apercu?.has(`${jour.date}|${creneau.creneau}`) === true}
                 />
               ))}
             </div>
@@ -229,12 +232,14 @@ export function VueSemaine(
  * l'ancienne application le permettait déjà.
  */
 function CaseDeCreneau(
-  { jour, creneau, onBasculer }: {
+  { jour, creneau, onBasculer, vise }: {
     readonly jour: JourDeLaSemaine;
     readonly creneau: CreneauDuJour;
     readonly onBasculer: (
       date: DateISO, missionId: string, entiteId: string, creneau: Creneau
     ) => void;
+    /** Le pinceau va la poser. */
+    readonly vise: boolean;
   }
 ) {
   const [premier] = creneau.occupants;
@@ -251,7 +256,8 @@ function CaseDeCreneau(
     occupe && premier.ajuste ? styles.ajuste : '',
     enConge ? styles.conge : '',
     jour.ferie ? styles.ferie : '',
-    jour.weekEnd ? styles.weekEnd : ''
+    jour.weekEnd ? styles.weekEnd : '',
+    vise ? styles.vise : ''
   ].filter((c) => c !== '').join(' ');
 
   // Le fond de la bande, pas seulement sa bordure. Depuis que la bande est
@@ -264,6 +270,9 @@ function CaseDeCreneau(
     <button
       type="button"
       className={classes}
+      // Ce que le pinceau lit pour savoir quelle moitié est sous le pointeur.
+      data-date={jour.date}
+      data-creneau={creneau.creneau}
       {...(fond !== undefined ? { style: { background: fond } } : {})}
       onClick={() => onBasculer(
         jour.date,

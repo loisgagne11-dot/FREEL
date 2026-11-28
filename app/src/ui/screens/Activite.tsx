@@ -1,7 +1,10 @@
-import { Suspense, lazy, useEffect, useId, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { composantALaDemande } from '../composantALaDemande';
 import { useFaits } from '../../state/store';
-import { poserAjustement, poserPlageDeConges, retirerAjustements } from '../../state/ecritures.activite';
+import { annulerAuPinceau, poserAuPinceau, retirerAjustements } from '../../state/ecritures.activite';
+import { type Application, type Changements, type Pinceau, aucunChangement } from '../../state/pinceau';
+import { type CaseVisee, useGestePinceau } from './Activite.geste';
+import type { RetourDuGeste } from './Activite.pinceau';
 import { dateDuJour, moisCourant, vlAu } from '../../state/selecteurs';
 import {
   type PoidsClient,
@@ -9,17 +12,12 @@ import {
   craDuMoisParMission, etatActivite, moisEnChiffres, planningDeLaSemaine, planningDuMois
 } from '../../state/selecteurs.activite';
 import { VueSemaine } from '../components/VueSemaine';
-import { VueMois } from '../components/VueMois';
 import { MoisEnChiffres } from '../components/MoisEnChiffres';
 import { CraCard } from '../components/CraCard';
 import { useToast } from '../components/Toasts';
-import { joursFeries } from '../../domain/calculs/activite';
 import type { JourDeLaSemaine } from '../../state/selecteurs.activite';
 import type { Creneau, Portee } from '../../domain/calculs/planning';
-import {
-  congeApresSaisie, creneauxDeLaPortee, creneauxOccupes, planifier, saisirSurPortee
-} from '../../domain/calculs/planning';
-import type { JourPlanifie } from '../../domain/calculs/planning';
+import { creneauxDeLaPortee } from '../../domain/calculs/planning';
 import { arretDuClient } from '../../domain/calculs/clientsOperationnels.lecture';
 import type { Affectation, SaisieDemiJournee } from '../components/EditeurDemiJournee';
 import {
@@ -105,6 +103,33 @@ const PlageDeConges = composantALaDemande(() => import('./Activite.conges')
 
 const CarteTarifJournalier = composantALaDemande(() => import('./Activite.analyse')
   .then((m) => m.CarteTarifJournalier), true);
+
+/**
+ * La barre de pinceaux arrive avec l'écran, au repos : le fragment d'Activité
+ * n'a pas la place de la porter (voir son en-tête). Tant qu'elle n'est pas là,
+ * aucun pinceau n'est en main, et la grille ouvre l'éditeur comme avant.
+ */
+const BarrePinceaux = composantALaDemande(() => import('./Activite.pinceau')
+  .then((m) => m.BarrePinceaux), true);
+
+/**
+ * La vue mois, au repos elle aussi.
+ *
+ * L'écran s'ouvre sur la SEMAINE (voir `vue`, plus bas) : le mois ne sert
+ * qu'au clic sur « Mois ». Le pinceau a fait passer le fragment de l'écran à
+ * 41,1 / 40 Ko ; le plafond ne se relève pas (invariant n° 7), et c'est la vue
+ * que le premier affichage ne montre pas qui sort. Téléchargée au repos, elle
+ * est là bien avant le premier clic.
+ */
+const VueMois = composantALaDemande(() => import('../components/VueMois')
+  .then((m) => m.VueMois), true);
+
+/** Un geste qu'on peut défaire, et d'où il est parti (pour le double-clic). */
+interface Annulable {
+  readonly changements: Changements;
+  readonly origine: string | null;
+  readonly le: number;
+}
 
 /** L'attente d'un formulaire, dans son panneau. Sobre : elle dure un instant. */
 function EnAttenteDeFormulaire() {
@@ -434,58 +459,96 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
     setAEditer({ date, creneau });
   }
 
+  /* ── Le pinceau ─────────────────────────────────────────────────────── */
+
+  /*
+   * Ce qu'on pose, et sur quelle portée. Rien n'en est stocké : ce n'est pas
+   * un fait, c'est l'outil qu'on a en main — un rechargement le repose.
+   */
+  const [pinceau, setPinceau] = useState<Pinceau | null>(null);
+  const [portee, setPortee] = useState<Portee>('journee');
+  /** Les gestes qu'on peut défaire, du plus ancien au plus récent. */
+  const [annulables, setAnnulables] = useState<readonly Annulable[]>([]);
+  const [retour, setRetour] = useState<RetourDuGeste | null>(null);
+  /** Les missions qu'un pinceau peut porter : celles que l'éditeur propose. */
+  const missionsEnCours = useMemo(
+    () => affectationsPossibles(faits, new Set(), dateDuJour()), [faits]
+  );
+  // Effacer agit sur la journée : une correction se retire jour par jour.
+  const porteeEffective: Portee = pinceau?.type === 'effacer' ? 'journee' : portee;
+
+  /** Retient un geste pour « Annuler » et Ctrl+Z — vingt au plus, en mémoire. */
+  function retenir(application: Application, origine: string | null): void {
+    if (aucunChangement(application.changements)) return;
+    setAnnulables((pile) => [
+      ...pile.slice(-19), { changements: application.changements, origine, le: Date.now() }
+    ]);
+  }
+
+  function poser(dates: readonly DateISO[], isole: boolean, origine: CaseVisee): void {
+    if (pinceau === null) return;
+    const application = poserAuPinceau({ pinceau, portee: porteeEffective, dates, isole });
+    retenir(application, isole ? `${origine.date}|${origine.creneau}` : null);
+    setRetour({ id: Date.now(), pinceau, application });
+  }
+
+  const annulerLeDernier = useCallback((): void => {
+    const dernier = annulables.at(-1);
+    if (dernier === undefined) return;
+    setAnnulables((pile) => pile.slice(0, -1));
+    setRetour({ id: Date.now(), annules: annulerAuPinceau(dernier.changements) });
+  }, [annulables]);
+
+  /*
+   * LE DOUBLE-CLIC OUVRE LE DÉTAIL SANS RIEN POSER.
+   *
+   * Son premier clic a déjà posé le pinceau sur la case : sans retour en
+   * arrière, ouvrir l'éditeur pour un cas particulier modifierait d'abord la
+   * journée qu'on venait justement examiner. Le geste de ce premier clic est
+   * donc défait, s'il est le dernier et vient de cette case-là.
+   */
+  function ouvrirDepuisLaGrille(c: CaseVisee, double: boolean): void {
+    const dernier = annulables.at(-1);
+    if (double && dernier !== undefined && dernier.origine === `${c.date}|${c.creneau}`
+      && Date.now() - dernier.le < 1500) {
+      annulerAuPinceau(dernier.changements);
+      setAnnulables((pile) => pile.slice(0, -1));
+      setRetour(null);
+    }
+    setAEditer({ date: c.date, creneau: c.creneau });
+  }
+
+  const joursAffiches = (vue === 'mois' ? planningMois : semaine).jours;
+  const geste = useGestePinceau({
+    actif: pinceau !== null,
+    jours: joursAffiches,
+    creneaux: creneauxDeLaPortee(porteeEffective),
+    onPoser: poser,
+    onOuvrir: ouvrirDepuisLaGrille,
+    onLacher: () => setPinceau(null)
+  });
+
   /**
-   * Écrit ce que l'éditeur a rendu.
+   * Écrit ce que l'éditeur a rendu : un geste de pinceau sur un seul jour.
    *
-   * ─────────────────────────────────────────────────────────────────────────
-   * TOUTES LES AFFECTATIONS SONT TOUCHÉES, PAS SEULEMENT CELLE QU'ON DÉSIGNE
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Une moitié de journée n'a qu'un occupant. Celle qu'on désigne la prend,
-   * toutes les autres la RENDENT — c'est cette libération, et elle seule, qui
-   * corrige une journée et demie posée sur un seul vendredi.
-   *
-   * On ne parcourt donc pas les seules missions actives : un ajustement peut
-   * survivre sur une mission terminée, et l'ignorer laisserait sur place le
-   * doublon qu'on vient précisément de venir défaire.
+   * Toutes les affectations sont touchées, pas seulement celle qu'on désigne —
+   * celle qu'on désigne prend la moitié, les autres la RENDENT (voir
+   * `state/pinceau`). L'écran le faisait lui-même, en une écriture par mission
+   * puis une pour le congé ; c'est maintenant la même règle et la même
+   * écriture unique que le pinceau, et le geste s'annule comme lui.
    */
   function appliquerSaisie(date: DateISO, saisie: SaisieDemiJournee): void {
-    const conges: Record<string, number> = {};
-    for (const c of faits.conges) conges[c.date] = c.quotite;
-    const annee = Number(date.slice(0, 4));
-    const feries = new Set(joursFeries(annee));
-
-    for (const m of faits.missions) {
-      for (const e of m.entites) {
-        const [jour] = planifier([date], {
-          rythmes: e.rythmes, ajustements: e.ajustements, feries, conges
-        });
-        if (jour === undefined) continue;
-
-        const occupe = saisie.type === 'travail'
-          && m.id === saisie.missionId && e.id === saisie.entiteId;
-        // Rien à changer : ni cette affectation ne prend la portée, ni elle ne
-        // la tenait. Écrire quand même poserait un ajustement identique au
-        // rythme sur toutes les missions du dossier, à chaque clic.
-        if (!occupe && !toucheLaPortee(jour, saisie.portee)) continue;
-
-        poserAjustement(m.id, e.id, date,
-          saisirSurPortee(jour, saisie.portee, occupe, saisie.lieu));
-      }
-    }
-
-    // Le congé APRÈS le travail : `congeApresSaisie` part de la quotité
-    // actuelle, et la lire après une écriture qui ne la touche pas donne le
-    // même résultat — mais l'ordre inverse ferait dépendre le calcul d'un état
-    // intermédiaire, ce qui est exactement ce qu'on ne veut pas relire dans six
-    // mois.
-    const actuel = faits.conges.find((c) => c.date === date)?.quotite ?? 0;
-    const apres = congeApresSaisie(actuel, saisie.portee, saisie.type);
-    if (apres !== actuel) {
-      if (apres === 0) poserPlageDeConges([date], false);
-      else poserPlageDeConges([date], true, apres);
-    }
-
+    const application = poserAuPinceau({
+      pinceau: saisie.type === 'travail'
+        ? { type: 'travail', missionId: saisie.missionId, entiteId: saisie.entiteId, lieu: saisie.lieu }
+        : { type: saisie.type },
+      portee: saisie.portee,
+      dates: [date],
+      isole: true
+    });
+    retenir(application, null);
+    // Le message d'un geste de pinceau plus ancien ne décrit plus le dernier.
+    setRetour(null);
     setAEditer(null);
     signaler(messageDeSaisie(saisie, affectations));
   }
@@ -611,9 +674,12 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                       Chaque journée porte deux créneaux. Ceux dont la position a été
                       saisie disent le matin ou l’après-midi&nbsp;; les autres — toute
                       journée d’avant cette version — sont RÉPARTIS pour pouvoir être
-                      dessinés, et n’affichent donc pas de lieu. Un clic bascule la
-                      moitié visée&nbsp;; la ramener à ce que le rythme prévoit efface
-                      la correction au lieu d’en poser une.
+                      dessinés, et n’affichent donc pas de lieu. Sans pinceau, un
+                      clic ouvre le détail de la moitié visée&nbsp;; avec un
+                      pinceau, il la pose. Ramener une journée à ce que le rythme
+                      prévoit efface la correction au lieu d’en poser une. Les
+                      jours fériés sont teintés et nommés&nbsp;: le rythme ne les
+                      remplit pas, mais tu peux y poser une astreinte.
                     </Info>
                   </h2>
 
@@ -689,20 +755,47 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                   </div>
                 </div>
 
+                <Suspense fallback={null}>
+                  <BarrePinceaux
+                    affectations={missionsEnCours}
+                    pinceau={pinceau}
+                    onPinceau={setPinceau}
+                    portee={portee}
+                    onPortee={setPortee}
+                    vue={vue}
+                    onRaccourci={() => {
+                      const premier = joursAffiches[0];
+                      if (premier !== undefined) {
+                        poser(joursAffiches.map((j) => j.date), false, { date: premier.date, creneau: 'matin' });
+                      }
+                    }}
+                    retour={retour}
+                    peutAnnuler={annulables.length > 0}
+                    onAnnuler={annulerLeDernier}
+                  />
+                </Suspense>
+
+                {/* Les gestes du pinceau sont délégués ici, pour les deux vues :
+                    voir `Activite.geste`. */}
+                <div className={pinceau !== null ? styles.auPinceau : undefined} {...geste.proprietes}>
                 {vue === 'mois'
                   ? (
-                    <VueMois
-                      planning={planningMois}
-                      libellePeriode={moisLong(mois)}
-                      aujourdhui={dateDuJour()}
-                      onBasculer={ouvrirEditeur}
-                    />
+                    <Suspense fallback={<EnAttenteDeFormulaire />}>
+                      <VueMois
+                        planning={planningMois}
+                        libellePeriode={moisLong(mois)}
+                        aujourdhui={dateDuJour()}
+                        onBasculer={ouvrirEditeur}
+                        apercu={geste.apercu}
+                      />
+                    </Suspense>
                   )
                   : (
                     <VueSemaine
                       planning={semaine}
                       aujourdhui={dateDuJour()}
                       onBasculer={ouvrirEditeur}
+                      apercu={geste.apercu}
                       onRevenirAuRythme={() => {
                         const n = retirerAjustements(semaine.jours.map((j) => j.date));
                         // L'effet se voit — la grille change sous les yeux — mais
@@ -714,6 +807,7 @@ export function Activite({ mois: moisChoisi, onMois }: ProprietesActivite = {}) 
                       }}
                     />
                   )}
+                </div>
               </section>
 
 
@@ -1096,20 +1190,6 @@ function occupantsDuJour(jour: JourDeLaSemaine | null): ReadonlySet<string> {
 /** L'identité d'une affectation, la même que celle de l'éditeur. */
 const cleAffectation = (missionId: string, entiteId: string): string =>
   `${missionId}\u00b7${entiteId}`;
-
-/**
- * Cette affectation occupe-t-elle une partie de la portée visée&nbsp;?
- *
- * Sans ce filtre, chaque enregistrement écrirait un ajustement sur TOUTES les
- * missions du dossier — y compris celles qui n'ont jamais rien eu ce jour-là.
- * Ils diraient la même chose que le rythme, donc rien ne se verrait à l'écran
- * — jusqu'au jour où un rythme change et où ces journées-là ne suivent pas.
- */
-function toucheLaPortee(jour: JourPlanifie, portee: Portee): boolean {
-  const vises = creneauxDeLaPortee(portee);
-  return creneauxOccupes(jour.retenu, jour.creneaux)
-    .some((o) => vises.includes(o.creneau));
-}
 
 /**
  * Ce que la saisie vient de faire, dit après coup.
