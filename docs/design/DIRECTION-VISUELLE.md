@@ -78,6 +78,11 @@ S'y ajoutent, par thème et dans `calme.css` : `--bar-soft` (la série en
 retrait d'une paire de barres), `--chip-ok` et `--chip-warn` (texte des
 pastilles), `--k1` à `--k3` et leur texte (clients du planning).
 
+Le 28/11, dans `tokens.css` seulement (aucune maquette ne dessine le
+planning) : `--ferie` et `--ferie-t`, la case d'un jour férié et son texte —
+une ardoise, ni un client ni l'ambre du congé. La paire passe 4,5:1 dans les
+quatre thèmes (`verifier:contraste`). À soumettre au propriétaire sur capture.
+
 ## Composants
 
 | Composant | Règle |

@@ -145,48 +145,10 @@ export function BarrePinceaux({
 
   return (
     <div className={styles.barre}>
-      <div className={styles.ligne}>
+      {/* L'étiquette et son « i » sur leur ligne : à côté des puces, le « i »
+          passait seul à la ligne dès qu'elles en remplissaient une. */}
+      <div className={styles.tete}>
         <span className={styles.etiquette} aria-hidden="true">Pinceau</span>
-        <div className={styles.puces} role="group" aria-label="Pinceau">
-          {puces.map((p) => {
-            const cible: Pinceau = { type: 'travail', missionId: p.missionId, entiteId: p.entiteId, lieu: p.lieu };
-            return (
-              <button
-                key={`${p.missionId}·${p.entiteId}`}
-                type="button"
-                className={`${styles.puce} ${choisi(cible) ? styles.puceActive : ''}`}
-                aria-pressed={choisi(cible)}
-                title={p.libelle}
-                onClick={() => basculer(cible)}
-              >
-                <span
-                  className={styles.pastille}
-                  {...(p.couleur !== '' ? { style: { background: p.couleur } } : {})}
-                  aria-hidden="true"
-                />
-                {/* « Pinceau » est dit, pas montré : l'étiquette le montre
-                    déjà, et sans lui « Congé » ou « ClientA » se confondraient,
-                    pour un lecteur d'écran, avec les boutons de l'éditeur. */}
-                <span className={styles.invisible}>Pinceau</span>{' '}
-                {nomDe(p)}
-                {p.lieu !== null && <span className={styles.lieu}>, {NOM_LIEU[p.lieu]}</span>}
-              </button>
-            );
-          })}
-          {(['conge', 'libre', 'effacer'] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={`${styles.puce} ${choisi({ type }) ? styles.puceActive : ''}`}
-              aria-pressed={choisi({ type })}
-              onClick={() => basculer({ type })}
-            >
-              <span className={`${styles.pastille} ${styles[type] ?? ''}`} aria-hidden="true" />
-              <span className={styles.invisible}>Pinceau</span>{' '}
-              {type === 'conge' ? 'Congé' : type === 'libre' ? 'Libre' : 'Effacer'}
-            </button>
-          ))}
-        </div>
         <Info libelle="Comment poser au pinceau">
           Choisis ce que tu poses, puis touche un jour&nbsp;: il le reçoit, même
           un samedi ou un férié. Glisse pour une plage — au téléphone, appuie
@@ -199,6 +161,53 @@ export function BarrePinceaux({
           rend les journées au rythme&nbsp;; un congé se retire avec
           «&nbsp;Libre&nbsp;».
         </Info>
+      </div>
+      <div className={styles.puces} role="group" aria-label="Pinceau">
+        {puces.map((p) => {
+          const cible: Pinceau = { type: 'travail', missionId: p.missionId, entiteId: p.entiteId, lieu: p.lieu };
+          return (
+            <button
+              key={`${p.missionId}·${p.entiteId}`}
+              type="button"
+              className={`${styles.puce} ${choisi(cible) ? styles.puceActive : ''}`}
+              aria-pressed={choisi(cible)}
+              title={p.libelle}
+              onClick={() => basculer(cible)}
+            >
+              <span
+                className={styles.pastille}
+                {...(p.couleur !== '' ? { style: { background: p.couleur } } : {})}
+                aria-hidden="true"
+              />
+              {/* « Pinceau » est dit, pas montré : l'étiquette le montre
+                  déjà, et sans lui « Congé » ou « ClientA » se confondraient,
+                  pour un lecteur d'écran, avec les boutons de l'éditeur. Le
+                  nom et son lieu tiennent dans UN texte : deux enfants du
+                  bouton, la virgule se détachait du nom de tout l'écart de
+                  la puce. */}
+              <span>
+                <span className={styles.invisible}>Pinceau</span>{' '}
+                {nomDe(p)}
+                {p.lieu !== null && <span className={styles.lieu}>, {NOM_LIEU[p.lieu]}</span>}
+              </span>
+            </button>
+          );
+        })}
+        {(['conge', 'libre', 'effacer'] as const).map((type) => (
+          <button
+            key={type}
+            type="button"
+            className={`${styles.puce} ${choisi({ type }) ? styles.puceActive : ''}`}
+            aria-pressed={choisi({ type })}
+            onClick={() => basculer({ type })}
+          >
+            <span className={`${styles.pastille} ${styles[type] ?? ''}`} aria-hidden="true" />
+            <span>
+              <span className={styles.invisible}>Pinceau</span>{' '}
+              {type === 'conge' ? 'Congé' : type === 'libre' ? 'Libre' : 'Effacer'}
+            </span>
+          </button>
+        ))}
       </div>
 
       {pinceau !== null && (

@@ -20,6 +20,8 @@
   min-width: 0;
 }
 
+.tete { display: flex; align-items: center; gap: 2px; min-height: 32px; }
+
 .etiquette {
   font-family: var(--mono);
   font-size: 11px;
