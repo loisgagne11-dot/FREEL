@@ -17,6 +17,7 @@
 
 import type { Jour, ZoneFeries } from '../domain/calculs/activite';
 import { joursFeries } from '../domain/calculs/activite';
+import { type NomDeFerie, nommerFeries } from '../domain/calculs/calendrier.noms';
 import type { Creneau, JourPlanifie, Lieu } from '../domain/calculs/planning';
 import {
   CRENEAUX, craDuMois, creneauxOccupes, jourDeSemaine, lundiDeLaSemaine, planifier
@@ -284,6 +285,15 @@ export function lignesDeMission(faits: Faits): readonly LigneMission[] {
 export interface JourDeLaSemaine {
   readonly date: DateISO;
   readonly ferie: boolean;
+  /**
+   * Le nom du férié, `null` tout autre jour.
+   *
+   * À côté du booléen et non à sa place : `ferie` est ce que les comptes lisent
+   * (`decompterJours`, le CRA), le nom n'est que ce que la case affiche. Les
+   * deux sortent du même appel au calendrier, plus bas — un jour ne peut pas
+   * être compté férié sans porter de nom, ni nommé sans être compté.
+   */
+  readonly nomDuFerie: NomDeFerie | null;
   readonly weekEnd: boolean;
   readonly conge: number;
   /** Ce que le rythme prévoit, toutes missions confondues. */
@@ -432,8 +442,9 @@ function planningDesDates(
   // Les fériés peuvent tomber sur deux années quand la semaine est à cheval
   // sur le 31 décembre.
   const annees = new Set(dates.map((d) => Number(d.slice(0, 4))));
-  const feries = new Set<string>();
-  for (const a of annees) for (const f of joursFeries(a, zone)) feries.add(f);
+  const nomsDesFeries = new Map<string, NomDeFerie>();
+  for (const a of annees) for (const [d, n] of nommerFeries(a, zone)) nomsDesFeries.set(d, n);
+  const feries = new Set<string>(nomsDesFeries.keys());
 
   const conges: Record<string, number> = {};
   for (const c of faits.conges) conges[c.date] = c.quotite;
@@ -499,6 +510,7 @@ function planningDesDates(
     return {
       date,
       ferie: feries.has(date),
+      nomDuFerie: nomsDesFeries.get(date) ?? null,
       /*
        * LE SAMEDI EST UN SAMEDI, MISSION OU PAS.
        *

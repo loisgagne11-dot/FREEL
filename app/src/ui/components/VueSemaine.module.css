@@ -88,6 +88,9 @@
 .creneau:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
 .creneau:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 
+/* Ce que le pinceau va poser — voir la même règle dans VueMois. */
+.creneau.vise { box-shadow: inset 0 0 0 2px var(--green); }
+
 /* Travaillé, sans teinte de client connue : un vert neutre, faute de mieux.
    Dès qu'une couleur est choisie, le composant pose son propre fond en ligne
    (`fondBande`), et cette règle ne s'applique plus — l'inline l'emporte
@@ -116,8 +119,46 @@
   color: var(--amber);
 }
 
-.ferie { color: var(--amber); opacity: 0.75; }
+/* LE FÉRIÉ A SA TEINTE (22/11), sur toute la colonne. Il était ambre atténué
+   — la couleur du congé, à 75 % — et se confondait donc avec lui, sans dire
+   lequel des deux il était. L'ardoise de `--ferie` n'est ni un client ni le
+   congé ; les moitiés libres deviennent transparentes pour la laisser voir, une
+   moitié travaillée (une astreinte) garde sa bande. */
+.colonneFerie {
+  background: var(--ferie);
+  border-color: color-mix(in srgb, var(--ferie-t) 22%, transparent);
+  container-type: inline-size;
+}
+.colonneFerie .enteteJour { color: var(--ferie-t); }
+/* Un férié qui est aujourd'hui reste encadré : le cadre dit « tu es ici ». */
+.colonneDuJour.colonneFerie { border-color: var(--green); }
+.ferie:not(.travaille):not(.conge) { background: transparent; color: var(--ferie-t); }
+.ferie .etiquetteCreneau { color: var(--ferie-t); }
 .weekEnd { background: transparent; opacity: 0.5; }
+
+/* Le nom, sous la date. La largeur de la COLONNE décide, comme dans le mois :
+   57 px entre 1 100 et 1 300 px, 42 au téléphone — « férié » en dessous de
+   64 px, et la légende donne le nom entier. */
+.nomFerie {
+  display: block;
+  margin-top: 2px;
+  /* Le texte de l'application, pas le Mono de la date : un nom n'est pas un
+     chiffre à aligner. */
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.15;
+  color: var(--ferie-t);
+}
+.ferieLarge { display: none; }
+.ferieEtroit { display: inline; }
+
+@container (min-width: 64px) {
+  .nomFerie { font-size: 10.5px; }
+  .ferieLarge { display: inline; }
+  .ferieEtroit { display: none; }
+}
 
 .enteteCreneau {
   display: flex;
@@ -195,6 +236,8 @@
 }
 
 .pastilleConge { background: var(--amber); }
+/* Cerclée de son texte : l'ardoise pâle seule ne se verrait pas en thème clair. */
+.pastilleFerie { background: var(--ferie); box-shadow: inset 0 0 0 1.5px var(--ferie-t); }
 
 /* Nom accessible sans encombrement visuel. Pas de `display: none`, qui le
    retirerait de l'arbre d'accessibilité. */

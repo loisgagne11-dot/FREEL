@@ -98,7 +98,7 @@ un trou qui ne fait échouer aucun test.
 | Capacité de versement d'un mois à venir | ✅ | **Lot R.** Elle s'abstient tant que rien n'y est attendu, au lieu d'afficher un négatif né de dépenses projetées. L'ancienne application n'avait pas cet indicateur du tout |
 | `getScheduledDaysForMonth`, `joursParSemaine` | ✅ | `rythmes[]` par plages de dates, demi-journées comprises |
 | `showDaysEditor`, `saveDaysFromEditor`, `recalcDaysTable` | ✅ | Vue semaine avec ajustement à la journée ; l'ajustement l'emporte sur le rythme, **y compris à zéro** |
-| `fillAllDays` — remplir le mois d'un geste | 🚫 | **Sans objet ici.** Le planning se remplit déjà seul depuis le rythme, c'est le modèle même. Remplir à la main n'aurait de sens que sur un planning vide — et un planning vide se remplit en déclarant un rythme, pas en cliquant trente et une fois |
+| `fillAllDays` — remplir le mois d'un geste | 🟢 | ~~Sans objet ici~~ — vrai pour le rythme, qui remplit déjà le planning. Le besoin réel, nommé par le propriétaire le 22/11, était de poser **la même correction** sur beaucoup de jours : « Jours ouvrés du mois » au pinceau (28/11, voir la section en fin de document) |
 | `resetReelsToTheorique` — revenir au rythme | ✅ | **Ajouté le 13/08**, à la maille de la semaine. Le bouton n'apparaît que si elle porte une correction |
 | `buildCRAData`, `generateCRAHTMLContent`, `generateCRAPDF` | ✅ | **Lot P (29/08) : le générateur de CRA.** Atelier deux colonnes dans Outils › CRA — saisie à gauche, aperçu du document à droite, `Imprimer` et `Télécharger` en pied. Le document est une **synthèse hebdomadaire** : par semaine, les jours par client ventilés télétravail / sur site, la phrase de tâches, puis les totaux par client et le grand total. Le fichier téléchargé est **autonome** — il emporte sa feuille de style, parce qu'il s'ouvre chez le client sans notre application autour. **Depuis le 27/11, ce fichier est un vrai PDF** (« Télécharger le PDF », voir la section du 27/11) : le HTML autonome a quitté le CRA |
 | Le CRA porte un montant | 🚫 | **Retiré au lot P.** La carte d'Activité affichait le total de jours ET sa valorisation au TJM sur le document. Un CRA qui porte un prix se renégocie au lieu de se signer. La valorisation reste sur l'écran Activité, où elle s'adresse à l'utilisateur, et ne figure sur aucun papier remis au client |
@@ -111,7 +111,7 @@ un trou qui ne fait échouer aucun test.
 | Montants HT **et** TTC sur la facture | ✅ | **Lot Q.** Total HT, TVA, net à payer. En franchise la ligne de TVA dit « — » plutôt que de disparaître : une ligne absente laisse croire à un oubli, une ligne assumée dit que la question a été traitée |
 | `showCRAPreviewWithSend` — envoi au client | ❌ | Aperçu, impression et téléchargement au lot P. **L'envoi reste absent**, et avec lui les statuts « envoyé le », « validé », « archivé » que le handoff dessine dans sa liste « CRA récents » : aucun de ces trois faits n'est enregistré. La colonne montre donc les mois à documenter — ce qui est vrai — plutôt que des états simulés |
 | Congés, demi-journées, jours fériés | 🟢 | Fériés **calculés** (comput de Pâques compris) ; l'ancienne divisait par 20, une constante. **Lot G** : le congé se pose depuis le plan de charge lui-même, à la demi-journée. Le calendrier séparé qui le portait arrondissait au JOUR — une matinée de congé gonflait le solde de moitié, en silence |
-| `toggleConge` — poser un congé d'un clic | 🟢 | **Lot G** : le clic ouvre un éditeur au lieu de basculer. Un clic de plus sur le geste courant, et c'est le prix de trois choses que la bascule ne pouvait pas dire — le lieu, le client quand deux missions revendiquent la même moitié, et le congé à la demi-journée. Surtout, elle ne pouvait qu'AJOUTER une moitié, jamais la retirer à quelqu'un d'autre : une journée et demie posée sur un seul vendredi n'avait aucun geste pour la corriger |
+| `toggleConge` — poser un congé d'un clic | 🟢 | **Lot G** : le clic ouvre un éditeur au lieu de basculer. Un clic de plus sur le geste courant, et c'est le prix de trois choses que la bascule ne pouvait pas dire — le lieu, le client quand deux missions revendiquent la même moitié, et le congé à la demi-journée. Surtout, elle ne pouvait qu'AJOUTER une moitié, jamais la retirer à quelqu'un d'autre : une journée et demie posée sur un seul vendredi n'avait aucun geste pour la corriger. **28/11** : le congé d'un clic revient, au pinceau « Congé » — l'éditeur reste au double-clic |
 | `showWeeklyBreakdownModal` | ✅ | Vue semaine |
 
 ## 3. Argent, charges, trésorerie
@@ -836,3 +836,21 @@ lot.
 | `setFactureStatus(…, 'envoyée')` — qui posait `dateEnvoi` au jour du clic | 🟢 | La date se propose (aujourd'hui) et se corrige ensuite ; un envoi à venir ou avant l'émission est refusé |
 | Ouvrir la pièce d'une facture | 🆕 | N'existait nulle part : la pièce se déposait et se vérifiait, ne se lisait pas. Nouvel onglet, adresse locale révoquée à sa fermeture, type forcé à ceux du dépôt (une pièce `text/html` ne s'ouvre pas) |
 | Numérotation continue au livre | 🟢 | Les numéros d'un autre logiciel ne comptent plus dans la suite de FREEL (ils y créaient des trous imaginaires) ; les doublons restent contrôlés partout |
+
+
+## 28/11 — Le planning : fériés lisibles, saisie au pinceau (demandés le 22/11)
+
+« Faire apparaître les jours fériés sur le calendrier » ; « je dois
+reparamétrer chaque jour — mieux vaut un paramétrage appliqué à tous les jours
+ou demi-journées que je veux, le moins de clics possible, et flexible ». La
+méthode a été déléguée : on choisit une fois ce qu'on pose, puis on touche ou
+glisse sur les jours.
+
+| Fonction | Verdict | Détail |
+|---|---|---|
+| Jours fériés au calendrier | 🟢 | L'ancienne les comptait sans les nommer ; la nouvelle les teintait à peine (pointillé du samedi au mois, ambre du congé à la semaine). Désormais : teinte `--ferie`, nom court dans la case (« Pentecôte »), « férié » quand la case fait moins de 72 px, nom entier dans la légende, dans le nom accessible des moitiés et dans l'éditeur. Les noms (`calendrier.noms`) nomment les dates de `joursFeries` sans en redéfinir aucune |
+| `fillAllDays` — remplir le mois d'un geste | 🟢 | Était 🚫 « sans objet » (le planning se remplit depuis le rythme). Le besoin réel était autre : poser **la même correction** sur beaucoup de jours. « Jours ouvrés du mois » et « Toute la semaine » le font, fériés, week-ends et congés sautés, en un geste et une écriture |
+| Poser une demi-journée | 🟢 | La barre de pinceaux : une puce par mission en cours (lieu habituel déduit des journées saisies), Congé, Libre, Effacer ; portée Journée / Matin / Après-midi ; lieu. Toucher pose un jour (même férié ou week-end), glisser pose une plage (au téléphone après un appui long de 450 ms, pour laisser le défilement au doigt), Maj + clic étend depuis le dernier jour, clavier : flèches, Maj + flèches, Entrée. Sans pinceau, le clic ouvre l'éditeur comme avant ; avec, le double-clic ou l'appui long l'ouvrent, sans rien poser |
+| Annuler une saisie du planning | 🆕 | N'existait dans aucune des deux versions. Chaque geste (clic, glissé, raccourci, ou enregistrement de l'éditeur) s'annule d'un seul « Annuler » ou par Ctrl+Z ; seules les journées qui portent encore ce que le geste a posé sont rétablies |
+| Une seule écriture par geste | 🟢 | L'éditeur écrivait une fois par mission touchée puis une fois pour le congé ; il passe désormais par la même règle que le pinceau (`state/pinceau`), en une écriture. `poserAjustement` est retiré |
+| Le lieu de la moitié rendue | 🟢 | Corrigé : attribuer le matin à un client en télétravail requalifiait l'après-midi du client qui le rendait, sur site, en télétravail |

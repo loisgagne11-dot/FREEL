@@ -1160,3 +1160,21 @@ Une facture encaissée sans mode de règlement reste **encaissée** — le statu
 se lit sur la date seule — et son manque reste un sujet « à compléter » du
 livre, jamais un retard (tests nommés). La suite de numérotation du livre
 n'additionne plus les numéros d'un autre logiciel ; les doublons, si.
+
+## 28/11 — Le planning : fériés lisibles, saisie au pinceau (demandés le 22/11)
+
+Deux nombres naissent, dans le message du pinceau ; aucun n'est retiré. Les
+vues semaine (V21) et mois (V22) gagnent le nom des fériés, qui n'est pas un
+nombre mais explique ceux qu'elles affichent : « 4 j ouvrés » sur une semaine
+de cinq se lit enfin, l'Ascension est écrite dans la colonne.
+
+| Nombre | Où il se lit | Avant | Maintenant |
+|---|---|---|---|
+| Demi-journées posées par un geste † | Barre de pinceaux, « 10 demi-journées posées pour Studio Lumen » | Absent : l'éditeur ne posait qu'une portée d'un jour, et le disait par un toast sans compte | Jours posés × créneaux de la portée (`Application.demiJournees`), sauts déduits. « Rien à changer » quand les jours portaient déjà le pinceau ; « N journées rendues au rythme » pour Effacer |
+| Jours sautés par une plage † | Même message, « sautés : 2 jours de week-end, Ascension, 1 jour de congé » | Absent | Comptés par motif (`sautSurUnePlage`, la règle même de l'aperçu) ; les fériés **nommés** ; « jours après l'arrêt du client » pour un client opérationnel arrêté |
+| Jours fériés du mois | Le mois en chiffres | Un compte, sans dire lesquels | Inchangé ; leurs noms se lisent dans la légende de la vue mois (« 14 Ascension ») et de la semaine (« 14 : Ascension ») |
+| Part de télétravail | Le mois en chiffres | Sur les demi-journées dont le lieu est renseigné | Inchangée. Le pinceau d'un client porte son **dernier lieu saisi** : peindre une semaine documente son lieu, et la part le compte. Sans lieu saisi, la puce n'en porte pas, et rien n'est inventé |
+
+**Non-régression vérifiée** : le décompte des jours ouvrés, l'occupation et
+le CRA lisent `ferie` comme avant ; le nom sort du même appel au calendrier
+que le booléen (test : le rythme ne remplit pas l'Ascension, et la nomme).

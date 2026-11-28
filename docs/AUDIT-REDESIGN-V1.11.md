@@ -1703,3 +1703,38 @@ démonstration, le mode changé au profil.
 partie et en retard (six boutons : Revoir, Corriger la date d'envoi,
 Enregistrer le règlement, Relancer, Annuler par un avoir, Joindre une pièce) ;
 la place des mois en attente au-dessus du mois courant.
+
+
+## 28/11 — Planning : les fériés lisibles, la saisie au pinceau (demandés le 22/11)
+
+Aucune maquette ne dessine la barre de pinceaux ni la teinte du férié : la
+barre reprend les filtres de la planche (`.e-filtres` — pilule, filet
+`--line-2`, l'actif inversé), le segment de la bascule Semaine / Mois et la
+pilule en contour des actions secondaires ; la teinte est un jeton nouveau
+(`--ferie`, `--ferie-t`), ajouté aux quatre thèmes et vérifié par
+`verifier:contraste`. **À soumettre au propriétaire sur capture.** Captures :
+`node scripts/capturer-app.mjs --ecran=activite-planning --port=4194` et
+`--ecran=activite-mois` (et `--largeur=390`), Calme et Nuit, relues le 28/11.
+Deux vues nouvelles : `activite-planning-ferie` (semaine du 11 mai, pinceau
+de Studio Lumen, « Toute la semaine » posé, l'Ascension sautée et dite) et
+`activite-mois-ferie` (mai, pinceau d'Atelier Novak en main).
+
+| Endroit | Avant | Maintenant |
+|---|---|---|
+| Case d'un férié, vue mois | Fond effacé et pointillé, comme un samedi | Teinte ardoise `--ferie`, numéro et nom (« Ascension », « 8 Mai 1945 ») en `--ferie-t`, en haut à droite. Sous 72 px de case — au téléphone, et entre 1 100 et 1 300 px quand la colonne des chiffres prend sa place —, « férié » : la largeur de la **case** décide (requête de conteneur), pas celle de la fenêtre |
+| Colonne d'un férié, vue semaine | Créneaux ambre à 75 %, « libre » | Colonne teintée, nom sous la date (« férié » sous 64 px), pas de « libre » |
+| Légendes | Clients, congé, lieux | + une entrée par férié de la période, nom entier (« 25 Lundi de Pentecôte ») — c'est là que le téléphone le lit |
+| Au-dessus de la grille | — | « PINCEAU » et son « i » ; puces (une par mission en cours avec pastille de teinte et lieu habituel, Congé, Libre, Effacer). Pinceau en main : portée, lieu, « Toute la semaine » / « Jours ouvrés du mois » à droite, puis le message du geste et « Annuler » (souligné, vert). Au téléphone, puces et réglages passent à la ligne : la grille descend d'environ 350 px tant qu'un pinceau est en main |
+| Pendant un glissé | — | Les moitiés que le geste posera s'encadrent de vert ; une plage n'allume pas ce qu'elle sautera |
+| Curseur | Pointeur | « cellule » quand un pinceau est en main ; ni sélection de texte ni bulle d'iOS à l'appui long |
+| La vue mois | Dans le fragment de l'écran | Chargée au repos (le fragment passait à 41,1 / 40 Ko) ; « Chargement… » ne se voit que si l'on clique « Mois » avant la fin du premier chargement |
+
+**Au téléphone (Chromium, toucher émulé, 390 px)** : un balayage rapide sur
+la grille fait défiler la page (340 px) sans rien poser ; un appui de 600 ms
+puis un glissé du lundi au vendredi ne la fait pas défiler, allume six moitiés
+et pose « 6 demi-journées · sautés : 2 jours de congé » ; un appui long
+immobile ouvre l'éditeur sans rien poser ; un toucher bref pose la journée.
+
+**Reste à voir par le propriétaire** : la hauteur de la barre au téléphone
+(trois lignes de puces avec trois missions) ; la teinte ardoise, proche du
+gris d'un jour désactivé en thème Calme.

@@ -47,7 +47,9 @@ const PAIRES = [
   ['--c-impot', '--card-a', SEUIL_GRAPHIQUE], ['--c-urssaf', '--card-a', SEUIL_GRAPHIQUE],
   ['--c-tva', '--card-a', SEUIL_GRAPHIQUE], ['--c-cfe', '--card-a', SEUIL_GRAPHIQUE],
   ['--chip-ok', '--green-deep', SEUIL_TEXTE], ['--chip-warn', '--amber-soft', SEUIL_TEXTE],
-  ['--k1t', '--k1', SEUIL_TEXTE], ['--k2t', '--k2', SEUIL_TEXTE], ['--k3t', '--k3', SEUIL_TEXTE]
+  ['--k1t', '--k1', SEUIL_TEXTE], ['--k2t', '--k2', SEUIL_TEXTE], ['--k3t', '--k3', SEUIL_TEXTE],
+  // Le nom du jour férié, dans sa case (22/11). Du texte de 9 à 11 px : 4,5:1.
+  ['--ferie-t', '--ferie', SEUIL_TEXTE]
 ];
 
 /** Une palette = un bloc dont le sélecteur porte `data-theme` (le repli `:root` est sur calme). */

@@ -41,13 +41,15 @@ const jour = (
   date: string,
   o: Partial<{
     ferie: boolean; weekEnd: boolean; conge: number;
+    nomDuFerie: JourDeLaSemaine['nomDuFerie'];
     lignes: readonly ReturnType<typeof ligne>[];
   }> = {}
 ): JourDeLaSemaine => {
   const lignes = o.lignes ?? [];
   return {
     date: dateISO(date),
-    ferie: o.ferie ?? false,
+    ferie: o.ferie ?? o.nomDuFerie !== undefined,
+    nomDuFerie: o.nomDuFerie ?? null,
     weekEnd: o.weekEnd ?? false,
     conge: o.conge ?? 0,
     prevu: lignes.reduce((s, l) => s + l.prevu, 0),
@@ -464,5 +466,44 @@ describe('revenir au rythme', () => {
 
     await utilisateur.click(screen.getByRole('button', { name: 'Garder les corrections' }));
     expect(defaire).not.toHaveBeenCalled();
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Le jour férié
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('le jour férié de la semaine', () => {
+  const fete = { nom: 'Fête nationale', court: '14 Juillet' };
+  const avecFerie = () => rendre({
+    lundi: dateISO('2026-07-13'),
+    jours: [
+      jour('2026-07-13'), jour('2026-07-14', { nomDuFerie: fete }), jour('2026-07-15'),
+      jour('2026-07-16'), jour('2026-07-17'),
+      jour('2026-07-18', { weekEnd: true }), jour('2026-07-19', { weekEnd: true })
+    ],
+    totalPrevu: 0,
+    totalRetenu: 0
+  });
+
+  /**
+   * Le férié était ambre atténué — la couleur du congé, à 75 % — sans nom :
+   * il se lisait comme un congé qu'on n'avait pas posé. Il porte maintenant
+   * son nom sous la date, et en entier dans le nom de ses moitiés.
+   */
+  it('nomme le férié en tête de sa colonne, et en entier pour qui ne la voit pas', () => {
+    avecFerie();
+    expect(screen.getByText('14 Juillet')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^14 juil\. 2026, matin, jour férié : Fête nationale$/ })).toBeTruthy();
+    expect(screen.getByText(/14\s: Fête nationale/)).toBeTruthy();
+  });
+
+  /** « libre » sur un férié contredirait l'en-tête : c'est un jour chômé. */
+  it('ne dit pas « libre » d’un jour férié', () => {
+    avecFerie();
+    const matin = screen.getByRole('button', { name: /^14 juil\. 2026, matin/ });
+    expect(within(matin).queryByText('libre')).toBeNull();
+    const mercredi = screen.getByRole('button', { name: /^15 juil\. 2026, matin/ });
+    expect(within(mercredi).getByText('libre')).toBeTruthy();
   });
 });

@@ -371,3 +371,51 @@ describe('le compte du mois', () => {
     expect(screen.getByText('5 j')).toBeTruthy();
   });
 });
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Les jours fériés
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe('les jours fériés du mois', () => {
+  const mai = () => render(
+    <VueMois
+      planning={planningDuMois(faitsVides(), mois('2026-05'))}
+      libellePeriode="mai 2026"
+      aujourdhui={D('2026-05-12')}
+      onBasculer={() => { /* ailleurs */ }}
+    />
+  );
+
+  /**
+   * UN FÉRIÉ SE NOMME, IL NE SE DEVINE PAS.
+   *
+   * La case n'avait qu'une bordure en pointillé, la même qu'un samedi : on ne
+   * savait pas pourquoi le rythme avait laissé ce lundi vide, et rien ne
+   * distinguait Pentecôte d'un oubli de saisie. La forme courte va dans la case
+   * (« Pentecôte »), la forme entière dans le nom accessible de chaque moitié
+   * et dans la légende — la seule que lit le téléphone.
+   */
+  it('nomme le férié dans sa case, et en entier pour qui ne la voit pas', () => {
+    mai();
+    expect(screen.getByText('Pentecôte')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^25 mai 2026, matin, jour férié : Lundi de Pentecôte$/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^25 mai 2026, après-midi, jour férié : Lundi de Pentecôte$/ })).toBeTruthy();
+  });
+
+  it('donne dans la légende le nom entier de chaque férié du mois', () => {
+    mai();
+    const legende = screen.getByText('Congé').closest('ul') as HTMLElement;
+    for (const nom of ['Fête du Travail', 'Victoire 1945', 'Ascension', 'Lundi de Pentecôte']) {
+      expect(within(legende).getByText(nom)).toBeTruthy();
+    }
+  });
+
+  /**
+   * Un mois sans férié n'a ni case teintée ni entrée de légende : « férié »
+   * affiché en juin se lirait comme une erreur du calendrier.
+   */
+  it('ne parle pas de férié un mois qui n’en a pas', () => {
+    rendre();
+    expect(screen.queryByText('férié')).toBeNull();
+  });
+});

@@ -4,6 +4,7 @@ import type { DateISO } from '../../domain/types';
 import { dateCourte } from '../format';
 import { decompterJours } from '../../domain/calculs/activite';
 import { ConfirmationSurPlace } from './ConfirmationSurPlace';
+import { feriesDeLaPeriode, nommerLeFerie } from './planning.ferie';
 import styles from './VueSemaine.module.css';
 
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -61,7 +62,7 @@ const NOM_LIEU: Readonly<Record<Lieu, string>> = {
  * déclarées, indiscernables des vraies.
  */
 export function VueSemaine(
-  { planning, aujourdhui, onBasculer, onRevenirAuRythme }: {
+  { planning, aujourdhui, onBasculer, onRevenirAuRythme, apercu = null }: {
     readonly planning: PlanningSemaine;
     readonly aujourdhui: DateISO;
     /** Bascule UN créneau d'une ligne. Ligne vide : on demande à qui l'affecter. */
@@ -70,6 +71,8 @@ export function VueSemaine(
     ) => void;
     /** Efface les corrections de la semaine : les journées redeviennent le rythme. */
     readonly onRevenirAuRythme: () => void;
+    /** Les moitiés que le pinceau s'apprête à poser — voir `VueMois`. */
+    readonly apercu?: ReadonlySet<string> | null;
   }
 ) {
   // Le bouton n'apparaît que s'il y a quelque chose à défaire. Un bouton
@@ -125,11 +128,25 @@ export function VueSemaine(
           return (
             <div
               key={jour.date}
-              className={`${styles.colonne} ${estAujourdhui ? styles.colonneDuJour : ''}`}
+              className={[
+                styles.colonne,
+                estAujourdhui ? styles.colonneDuJour : '',
+                jour.ferie ? styles.colonneFerie : ''
+              ].filter((c) => c !== '').join(' ')}
+              {...(jour.nomDuFerie !== null ? { title: jour.nomDuFerie.nom } : {})}
             >
               <div className={styles.enteteJour}>
                 <span aria-hidden="true">{JOURS[index]} {numero}</span>
                 <span className={styles.invisible}>{dateCourte(jour.date)}</span>
+                {/* Sous la date, comme on l'écrit sur un agenda. Une colonne de
+                    téléphone ne tient pas « Assomption » : elle dit « férié »,
+                    et la légende donne le nom — voir `VueMois`. */}
+                {jour.nomDuFerie !== null && (
+                  <span className={styles.nomFerie} aria-hidden="true">
+                    <span className={styles.ferieLarge}>{jour.nomDuFerie.court}</span>
+                    <span className={styles.ferieEtroit}>férié</span>
+                  </span>
+                )}
               </div>
 
               {jour.creneaux.map((creneau) => (
@@ -138,6 +155,7 @@ export function VueSemaine(
                   jour={jour}
                   creneau={creneau}
                   onBasculer={onBasculer}
+                  vise={apercu?.has(`${jour.date}|${creneau.creneau}`) === true}
                 />
               ))}
             </div>
@@ -160,6 +178,12 @@ export function VueSemaine(
           <span className={`${styles.pastille} ${styles.pastilleConge}`} aria-hidden="true" />
           Congé
         </li>
+        {feriesDeLaPeriode(planning.jours).map((f) => (
+          <li key={f.date} className={styles.legendeEntree}>
+            <span className={`${styles.pastille} ${styles.pastilleFerie}`} aria-hidden="true" />
+            {f.jour}&nbsp;: {f.nom}
+          </li>
+        ))}
         {/* Ici le pictogramme est MUET : son nom est écrit juste à côté, et
             `MarqueLieu` le répéterait hors écran — un lecteur d'écran
             entendrait « télétravail télétravail ». */}
@@ -208,12 +232,14 @@ export function VueSemaine(
  * l'ancienne application le permettait déjà.
  */
 function CaseDeCreneau(
-  { jour, creneau, onBasculer }: {
+  { jour, creneau, onBasculer, vise }: {
     readonly jour: JourDeLaSemaine;
     readonly creneau: CreneauDuJour;
     readonly onBasculer: (
       date: DateISO, missionId: string, entiteId: string, creneau: Creneau
     ) => void;
+    /** Le pinceau va la poser. */
+    readonly vise: boolean;
   }
 ) {
   const [premier] = creneau.occupants;
@@ -230,7 +256,8 @@ function CaseDeCreneau(
     occupe && premier.ajuste ? styles.ajuste : '',
     enConge ? styles.conge : '',
     jour.ferie ? styles.ferie : '',
-    jour.weekEnd ? styles.weekEnd : ''
+    jour.weekEnd ? styles.weekEnd : '',
+    vise ? styles.vise : ''
   ].filter((c) => c !== '').join(' ');
 
   // Le fond de la bande, pas seulement sa bordure. Depuis que la bande est
@@ -243,6 +270,9 @@ function CaseDeCreneau(
     <button
       type="button"
       className={classes}
+      // Ce que le pinceau lit pour savoir quelle moitié est sous le pointeur.
+      data-date={jour.date}
+      data-creneau={creneau.creneau}
       {...(fond !== undefined ? { style: { background: fond } } : {})}
       onClick={() => onBasculer(
         jour.date,
@@ -282,7 +312,9 @@ function CaseDeCreneau(
       )}
 
       {enConge && <span className={styles.motCase} aria-hidden="true">Congé</span>}
-      {libre && <span className={styles.motLibre} aria-hidden="true">libre</span>}
+      {/* Un férié n'est pas « libre » : c'est un jour chômé, et l'en-tête de
+          la colonne le nomme déjà. Les deux mots ensemble se contrediraient. */}
+      {libre && !jour.ferie && <span className={styles.motLibre} aria-hidden="true">libre</span>}
     </button>
   );
 }
@@ -335,11 +367,13 @@ function etatDuCreneau(jour: JourDeLaSemaine, creneau: CreneauDuJour): string {
   const noms = creneau.occupants
     .map((o) => (o.description !== '' ? `${o.nom}, ${o.description}` : o.nom))
     .join(' et ');
+  const ferie = nommerLeFerie(jour);
   if (noms !== '') {
     const ajuste = creneau.occupants.some((o) => o.ajuste) ? ', ajusté' : '';
-    return `${noms}${ajuste}`;
+    // Une astreinte un férié se dit avec le férié : voir `VueMois`.
+    return `${noms}${ajuste}${ferie === null ? '' : `, ${ferie}`}`;
   }
-  if (jour.ferie) return 'jour férié';
+  if (ferie !== null) return ferie;
   if (jour.conge > 0) return 'congé';
   if (jour.weekEnd) return 'week-end';
   return 'libre';

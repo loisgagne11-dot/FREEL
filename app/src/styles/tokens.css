@@ -18,7 +18,7 @@
    tous les suivants ; posé tel quel sur le dernier, il aurait écrasé les
    trois autres thèmes partout. `:where()` ramène sa spécificité à zéro : il
    cède à n'importe quel thème posé, quelle que soit sa place. Les quatre
-   blocs déclarent les mêmes 57 propriétés, si bien qu'aucune valeur du
+   blocs déclarent les mêmes 58 propriétés, si bien qu'aucune valeur du
    repli ne transparaît sous un autre thème.
    ============================================================ */
 
@@ -88,6 +88,14 @@
   --k2t: #a9d4f0;
   --k3: #2a2140;
   --k3t: #d3c2f3;
+  /* Le jour férié (22/11) : une teinte à lui, ni celle d'un client ni l'ambre
+     du congé — un férié n'est pas « à surveiller », il est chômé. Ardoise,
+     parce qu'aucun repère de la direction ne la porte déjà. `--ferie-t` est le
+     texte posé dessus — nom, numéro, étiquettes : `--muted-2` y tombe sous
+     4,5:1 dans les quatre thèmes. La paire est vérifiée par
+     `verifier:contraste`. */
+  --ferie: #172530;
+  --ferie-t: #a7c5da;
   --slate: #7c8794;
   --blue-soft: rgba(111, 182, 224, .13);
 }
@@ -159,6 +167,9 @@
   --k2t: #b9d3e2;
   --k3: #37324a;
   --k3t: #d2c8ee;
+  /* Férié : voir le bloc « sombre ». */
+  --ferie: #2c3438;
+  --ferie-t: #b9cad6;
   --slate: #93998a;
   --blue-soft: rgba(143, 178, 198, .15);
 }
@@ -239,6 +250,9 @@
   --k2t: #1f4f80;
   --k3: #e9e1f7;
   --k3t: #563a8c;
+  /* Férié : voir le bloc « sombre ». */
+  --ferie: #e1e9f2;
+  --ferie-t: #27496b;
   --slate: #57626c;
   --blue-soft: rgba(43, 107, 166, .14);
 }
@@ -311,6 +325,9 @@
   --k2t: #3d5f78;
   --k3: #e8e1f0;
   --k3t: #5d4a82;
+  /* Férié : voir le bloc « sombre ». */
+  --ferie: #e4e8ec;
+  --ferie-t: #3d5466;
   --slate: #6b6f61;
   --blue-soft: #dde6ea;
 }
